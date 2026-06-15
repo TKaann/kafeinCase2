@@ -1,0 +1,16 @@
+# Test profile: keep test output clean (no verbose SQL/trace), tests must not depend on logs.
+spring:
+  jpa:
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        use_sql_comments: false
+
+logging:
+  level:
+    root: WARN
+    org.hibernate.SQL: WARN
+    org.hibernate.orm.jdbc.bind: WARN
+    org.springframework.transaction: WARN
+    com.example.orderservice: INFO

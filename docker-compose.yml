@@ -1,0 +1,9 @@
+# Single-command startup. H2 is in-memory, so no separate database service is needed.
+services:
+  order-service:
+    build: .
+    image: order-service:latest
+    container_name: order-service
+    ports:
+      - "8080:8080"
+    restart: unless-stopped

@@ -1,0 +1,44 @@
+spring:
+  application:
+    name: order-service
+
+  datasource:
+    url: jdbc:h2:mem:orderdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+      settings:
+        web-allow-others: false
+
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
+
+# Application-specific configuration
+app:
+  cors:
+    # Origins allowed to call the API from a browser (e.g. the planned test-harness frontend).
+    # Override per environment; falls back to these dev defaults when unset.
+    allowed-origins:
+      - http://localhost:5173
+      - http://localhost:3000
+
+logging:
+  level:
+    root: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
+    org.springframework.transaction: DEBUG
+    org.springframework.retry: DEBUG
+    com.example.orderservice: DEBUG
