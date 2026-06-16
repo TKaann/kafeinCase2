@@ -109,6 +109,13 @@ crypto stay limitless, used for the large/concurrent tests). Verified end-to-end
 Docker container with real parallel HTTP (`xargs -P`): 60 concurrent orders on stock=10 → exactly 10
 × 201 + 50 × 409, final stock 0; 100 reverse-ordered concurrent orders → all 201, no deadlock.
 
+### 11. Pre-submission cleanup
+Removed dead code to keep the model lean: the unused `Order` methods `markFailed()`, `isPaid()`,
+`removeItem()`, and the never-produced enum values (`OrderStatus.FAILED/CANCELLED`,
+`PaymentStatus.PENDING/FAILED/REFUNDED`) — leaving only what the flow actually emits
+(`OrderStatus{PENDING,CONFIRMED}`, `PaymentStatus{COMPLETED}`). Failed orders roll back rather than
+persist, so failure states were genuinely unreachable.
+
 ## Local environment note (not a project decision)
 On the dev machine the project path contains a non-ASCII character (`...\Masaüstü\...`), which
 breaks the forked JVM used by `mvn spring-boot:run` and Surefire ("Could not find or load main

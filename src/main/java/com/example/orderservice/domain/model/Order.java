@@ -2,7 +2,6 @@ package com.example.orderservice.domain.model;
 
 import com.example.orderservice.domain.enums.OrderStatus;
 import com.example.orderservice.domain.enums.PaymentMethod;
-import com.example.orderservice.domain.enums.PaymentStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
@@ -48,15 +47,10 @@ public class Order {
     @OneToOne(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private Payment payment;
 
-    // Helper method for bi-directional relationship management
+    /** Adds an item, keeping both sides of the bi-directional relationship in sync. */
     public void addItem(OrderItem item) {
         items.add(item);
         item.setOrder(this);
-    }
-
-    public void removeItem(OrderItem item) {
-        items.remove(item);
-        item.setOrder(null);
     }
 
     /** Attaches the payment, keeping both sides of the bi-directional relationship in sync. */
@@ -74,13 +68,5 @@ public class Order {
 
     public void markConfirmed() {
         this.status = OrderStatus.CONFIRMED;
-    }
-
-    public void markFailed() {
-        this.status = OrderStatus.FAILED;
-    }
-
-    public boolean isPaid() {
-        return payment != null && payment.getStatus() == PaymentStatus.COMPLETED;
     }
 }
