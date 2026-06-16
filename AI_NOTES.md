@@ -45,6 +45,11 @@ Invariants live on the entities: `Product.decreaseStock()` enforces "stock never
 `OrderItem.of()` snapshots unit price and computes subtotal, `Order` owns total calculation and
 status transitions. Services orchestrate; they don't hold business rules.
 
+To keep the invariant un-bypassable, entities expose **no blanket `@Setter`** — stock changes only
+through `decreaseStock`/`changeStockTo`, and the bidirectional back-references use a
+package-private `setOrder` so only the `Order` aggregate can wire them. (Hibernate uses field
+access, so dropping setters doesn't affect loading.)
+
 ### 4. Transaction boundary
 `OrderService.createOrder` is a single `@Transactional` covering stock decrement + order/items +
 payment. Any failure (insufficient stock, failed payment) rolls everything back — no half order,

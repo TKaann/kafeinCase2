@@ -7,7 +7,6 @@ import java.math.BigDecimal;
 @Entity
 @Table(name = "order_items")
 @Getter
-@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -33,6 +32,11 @@ public class OrderItem {
 
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal subtotal;
+
+    /** Package-private: only the owning {@link Order} wires this back-reference. */
+    void setOrder(Order order) {
+        this.order = order;
+    }
 
     /**
      * Builds an order item from a product, snapshotting the current unit price so future

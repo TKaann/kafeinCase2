@@ -10,7 +10,6 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "payments")
 @Getter
-@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -41,4 +40,9 @@ public class Payment {
     @Column(nullable = false)
     @Builder.Default
     private LocalDateTime processedAt = LocalDateTime.now();
+
+    /** Package-private: only the owning {@link Order} wires this back-reference. */
+    void setOrder(Order order) {
+        this.order = order;
+    }
 }
