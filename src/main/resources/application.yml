@@ -28,11 +28,15 @@ spring:
 # Application-specific configuration
 app:
   cors:
-    # Origins allowed to call the API from a browser (e.g. the planned test-harness frontend).
-    # Override per environment; falls back to these dev defaults when unset.
+    # Origins allowed to call the API from another origin (browser). The bundled test-harness is
+    # served same-origin on 8080, so it needs no CORS; these are for an external frontend.
     allowed-origins:
       - http://localhost:5173
       - http://localhost:3000
+  payment:
+    # Max amount for a single CREDIT_CARD payment; larger orders are declined (-> 422 + rollback).
+    # Bank transfer and crypto are limitless.
+    credit-card-limit: 10000
 
 logging:
   level:

@@ -26,6 +26,14 @@ public class ProductService {
                 .orElseThrow(() -> new ProductNotFoundException(productId));
     }
 
+    @Transactional
+    public Product setStock(Long productId, int newQuantity) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ProductNotFoundException(productId));
+        product.changeStockTo(newQuantity);
+        return product; // dirty checking flushes the change on commit
+    }
+
     /**
      * Fetches a product with a pessimistic write lock for the duration of the current
      * transaction. Must be called from within a transaction (e.g. order creation); the lock

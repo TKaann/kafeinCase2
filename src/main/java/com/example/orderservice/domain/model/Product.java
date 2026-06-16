@@ -52,4 +52,12 @@ public class Product {
         }
         this.stockQuantity -= quantity;
     }
+
+    /** Sets stock to an absolute value (administrative/reset operation). */
+    public void changeStockTo(int newQuantity) {
+        if (newQuantity < 0) {
+            throw new IllegalArgumentException("Stock cannot be negative: " + newQuantity);
+        }
+        this.stockQuantity = newQuantity;
+    }
 }

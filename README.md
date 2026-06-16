@@ -50,8 +50,22 @@ yoktur. Hızlı sağlık kontrolü:
 curl http://localhost:8080/api/products
 ```
 
+H2 konsolu (`/h2-console`) Docker'da da çalışır: container içindeki H2, host tarayıcısını "remote"
+sayacağından `docker-compose.yml` yalnızca container'da `SPRING_H2_CONSOLE_SETTINGS_WEB_ALLOW_OTHERS=true`
+verir; yereldeki güvenli varsayılan (`false`) değişmez.
+
 > Maven yerelde kuruluysa Docker'a gerek yoktur; yukarıdaki `mvn spring-boot:run` / `mvn test`
 > komutları doğrudan çalışır.
+
+## Test paneli (web harness)
+
+Uygulama ayağa kalktıktan sonra tarayıcıdan **`http://localhost:8080/`** açıldığında basit bir test
+paneli gelir (Spring tarafından `static/` altından same-origin servis edilir — ayrı sunucu/CORS
+yok). Panelde: ürün-stok listesi (+ yenile), stok ayarlama kontrolü, manuel sipariş formu ve
+otomatik testlerimizin **canlı karşılığı olan tek-tık senaryo butonları** (happy path, yetersiz
+stok rollback, çok-kalemli rollback, ödeme reddi, 500 eşzamanlı sipariş, deadlock-freedom, paralel
+bulk, hata matrisi). Her senaryo gerçek API çağrıları yapar ve sonucu/doğrulamasını çıktı
+panelinde gösterir. Vanilla JS + `fetch`; framework/build adımı yoktur.
 
 ---
 
@@ -63,6 +77,7 @@ Tüm uçlar JSON döner. Base path `/api`.
 |---|---|---|
 | `GET` | `/api/products` | Ürünleri (stok + fiyat) listele |
 | `GET` | `/api/products/{id}` | Tek ürün detayı |
+| `PATCH` | `/api/products/{id}/stock` | Stoğu mutlak değere ayarla (test-harness reset'i) |
 | `POST` | `/api/orders` | Tek sipariş oluştur |
 | `POST` | `/api/orders/bulk` | Birden fazla siparişi **paralel** işle |
 | `GET` | `/api/orders/{id}` | Sipariş detayı |
@@ -178,6 +193,15 @@ negatif değil. `OrderedLockingConcurrencyTest` ise ürünleri ters sırada iste
 deadlock olmadığını doğrular.
 
 ---
+
+## Yapılandırma
+
+`application.yml` üzerinden (ortam değişkeni/CLI ile override edilebilir):
+
+| Property | Varsayılan | Açıklama |
+|---|---|---|
+| `app.payment.credit-card-limit` | `10000` | Tek bir kredi kartı ödemesinin üst sınırı; aşılırsa ödeme reddedilir (→ 422 + rollback). Banka havalesi ve kripto limitsizdir. |
+| `app.cors.allowed-origins` | `localhost:5173,3000` | Dış (farklı origin) frontend için izinli origin'ler. Dahili test paneli same-origin olduğu için CORS gerektirmez. |
 
 ## Tasarım kararları
 

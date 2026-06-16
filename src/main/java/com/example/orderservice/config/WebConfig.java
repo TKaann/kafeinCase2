@@ -1,18 +1,15 @@
 package com.example.orderservice.config;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
- * Web-layer configuration. Enables CORS for the REST API so a browser-based frontend
- * (the planned test-harness) can consume it. Allowed origins are externalized via
- * {@link CorsProperties}.
+ * Web-layer configuration. Enables CORS for the REST API so a browser-based frontend can consume
+ * it from another origin. Allowed origins are externalized via {@link CorsProperties}.
  */
 @Configuration
-@EnableConfigurationProperties(CorsProperties.class)
 @RequiredArgsConstructor
 public class WebConfig implements WebMvcConfigurer {
 

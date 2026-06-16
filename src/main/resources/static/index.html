@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Service — Test Harness</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header>
+    <h1>Order Service — Test Harness</h1>
+    <p>Aynı 8080 portunda servis edilen panel. Her senaryo gerçek API çağrıları yapar; sonuç ve
+        doğrulama aşağıdaki çıktı panelinde görünür.</p>
+</header>
+
+<main>
+    <section class="card">
+        <div class="card-head">
+            <h2>Ürünler</h2>
+            <button id="refresh" class="ghost">Yenile</button>
+        </div>
+        <table>
+            <thead>
+            <tr><th>ID</th><th>Ad</th><th>Fiyat</th><th>Stok</th></tr>
+            </thead>
+            <tbody id="products"></tbody>
+        </table>
+    </section>
+
+    <div class="row">
+        <section class="card">
+            <h2>Stok Ayarla</h2>
+            <p class="hint">Senaryoları tekrar çalıştırmak için stoğu sıfırlamakta kullanılır.</p>
+            <label>Ürün ID <input id="stock-id" type="number" value="8" min="1"></label>
+            <label>Yeni Stok <input id="stock-qty" type="number" value="10" min="0"></label>
+            <button id="set-stock">Ayarla</button>
+        </section>
+
+        <section class="card">
+            <h2>Manuel Sipariş</h2>
+            <p class="hint">Çok kalemli sipariş. Bu form stoğu sıfırlamaz; kümülatif stok düşüşünü
+                görebilirsiniz.</p>
+            <div id="order-lines"></div>
+            <button id="add-line" class="ghost" type="button">+ Ürün ekle</button>
+            <div class="order-footer">
+                <label>Ödeme
+                    <select id="order-pay">
+                        <option>CREDIT_CARD</option>
+                        <option>BANK_TRANSFER</option>
+                        <option>CRYPTO</option>
+                    </select>
+                </label>
+                <button id="place-order">Sipariş Ver</button>
+            </div>
+        </section>
+    </div>
+
+    <section class="card">
+        <h2>Test Senaryoları</h2>
+        <p class="hint">Her biri otomatik testlerimizin canlı karşılığı. Tek tıkla çalışır.</p>
+        <div class="buttons">
+            <button data-sc="1">1 · Tek sipariş (happy path)</button>
+            <button data-sc="2">2 · Çok-kalemli sipariş</button>
+            <button data-sc="3">3 · Yetersiz stok → 409 + rollback</button>
+            <button data-sc="4">4 · Çok-kalemli stok rollback</button>
+            <button data-sc="5">5 · Ödeme reddi (CC limit) → 422 + rollback</button>
+            <button data-sc="6">6 · Eşzamanlı tek ürün (500 paralel)</button>
+            <button data-sc="7">7 · Deadlock-freedom (ters sıra)</button>
+            <button data-sc="8">8 · Paralel toplu işleme (bulk)</button>
+            <button data-sc="9">9 · Hata matrisi (404 + 400)</button>
+        </div>
+    </section>
+
+    <section class="card">
+        <div class="card-head">
+            <h2>Çıktı</h2>
+            <button id="clear-log" class="ghost">Temizle</button>
+        </div>
+        <pre id="log"></pre>
+    </section>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

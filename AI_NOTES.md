@@ -93,6 +93,22 @@ separate DB container would be dead weight. Tests run via `mvn test`, not inside
 (`-DskipTests`). Verified end-to-end: `docker compose up --build` boots the container, seeds the
 8 products, and serves orders on 8080.
 
+The H2 console is blocked for "remote" clients by default; in a container the host browser counts
+as remote. Rather than weakening the local config, compose sets
+`SPRING_H2_CONSOLE_SETTINGS_WEB_ALLOW_OTHERS=true` only for the container (relaxed-binding override),
+so `application.yml` keeps the secure `false` default locally.
+
+### 10. Test harness (static frontend) + supporting endpoints
+A vanilla-JS panel under `src/main/resources/static/` is served same-origin on 8080 (no separate
+server, no CORS). It mirrors the JUnit tests as one-click scenario buttons (happy path, stock/payment
+rollbacks, 500-order concurrency, deadlock-freedom, parallel bulk, error matrix). Two small backend
+additions support it: `PATCH /api/products/{id}/stock` to reset stock between runs, and a
+configurable `app.payment.credit-card-limit` (default 10000) so a credit-card order above the limit
+returns `PaymentResult.failure` — driving the existing 422 + rollback flow live (bank transfer and
+crypto stay limitless, used for the large/concurrent tests). Verified end-to-end against the running
+Docker container with real parallel HTTP (`xargs -P`): 60 concurrent orders on stock=10 → exactly 10
+× 201 + 50 × 409, final stock 0; 100 reverse-ordered concurrent orders → all 201, no deadlock.
+
 ## Local environment note (not a project decision)
 On the dev machine the project path contains a non-ASCII character (`...\Masaüstü\...`), which
 breaks the forked JVM used by `mvn spring-boot:run` and Surefire ("Could not find or load main

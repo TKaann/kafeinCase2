@@ -1,5 +1,6 @@
 package com.example.orderservice.payment;
 
+import com.example.orderservice.config.PaymentProperties;
 import com.example.orderservice.domain.enums.PaymentMethod;
 import com.example.orderservice.payment.strategy.BankTransferPaymentStrategy;
 import com.example.orderservice.payment.strategy.CreditCardPaymentStrategy;
@@ -7,6 +8,7 @@ import com.example.orderservice.payment.strategy.CryptoPaymentStrategy;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -18,7 +20,7 @@ class PaymentStrategyRegistryTest {
     @Test
     void resolve_returnsStrategyMatchingTheMethod() {
         PaymentStrategyRegistry registry = new PaymentStrategyRegistry(List.of(
-                new CreditCardPaymentStrategy(),
+                new CreditCardPaymentStrategy(new PaymentProperties(new BigDecimal("10000"))),
                 new BankTransferPaymentStrategy(),
                 new CryptoPaymentStrategy()));
 
@@ -29,7 +31,8 @@ class PaymentStrategyRegistryTest {
 
     @Test
     void resolve_unregisteredMethod_throws() {
-        PaymentStrategyRegistry registry = new PaymentStrategyRegistry(List.of(new CreditCardPaymentStrategy()));
+        PaymentStrategyRegistry registry = new PaymentStrategyRegistry(
+                List.of(new CreditCardPaymentStrategy(new PaymentProperties(new BigDecimal("10000")))));
 
         assertThatExceptionOfType(IllegalArgumentException.class)
                 .isThrownBy(() -> registry.resolve(PaymentMethod.CRYPTO));
