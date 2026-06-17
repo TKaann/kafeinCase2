@@ -126,3 +126,135 @@ On the dev machine the project path contains a non-ASCII character (`...\Masaüs
 breaks the forked JVM used by `mvn spring-boot:run` and Surefire ("Could not find or load main
 class"). Locally we run the app via `java -cp` directly and tests with `mvn test -DforkCount=0`.
 On a normal path the documented single commands (`mvn spring-boot:run`, `mvn test`) work as-is.
+
+---
+
+# Türkçe Çeviri — AI İşbirliği & Karar Notları
+
+> README'nin "AI şeffaflık" bölümü için çalışma notları. Hangi AI önerisine güvendiğimizi,
+> hangisini sorguladığımızı ve temel mühendislik kararlarının gerekçelerini kaydeder.
+
+## AI ile nasıl çalıştık
+- İlk analiz (`case_analysis.md`) ve Faz 0 / Faz 1 iskeleti bir AI oturumunda üretildi, sonra
+  devam etmeden önce ikinci bir oturumda eleştirel olarak gözden geçirildi.
+- AI çıktısını **körü körüne kabul etmedik** — aşağıdaki kararların birçoğu inceleme sonrası
+  değiştirildi.
+
+## Temel kararlar
+
+### 1. Locking stratejisi: optimistic+retry değil, pessimistic *(önceki AI kararı değiştirildi)*
+İlk analiz **optimistic locking (`@Version`) + Spring Retry** öneriyordu. İncelemede bunu *birincil*
+mekanizma olarak reddettik: değerlendirme, tek bir ürüne çok sayıda eşzamanlı istek atıyor (tek hot
+row). Orada optimistic+retry retry storm üretir, `OptimisticLockException` (bug gibi görünen bir
+lock hatası) ortaya çıkarır ve retry-tükenmesi kaynaklı false-failure riski taşır.
+
+**Pessimistic write lock**'a geçtik (`ProductRepository.findByIdForUpdate` üzerinde
+`@Lock(PESSIMISTIC_WRITE)`, `SELECT ... FOR UPDATE`):
+- Aynı ürüne gelen eşzamanlı siparişler DB satır kilidinde temiz biçimde serialize olur.
+- Fazla istekler lock hatası değil, doğru bir **iş hatası** (`InsufficientStockException`) alır.
+- Eşzamanlılık testi deterministiktir (flaky değil).
+- Çok-kalemli siparişlerde deadlock'u önlemek için ürünler **artan id sırasıyla** kilitlenir.
+
+`@Version`, Product'ta ucuz bir ikincil savunma olarak kalır. Pessimistic-lock kararı kesinleşince
+`spring-retry` ve `spring-boot-starter-aop` build'den **kaldırıldı**: kodda hiçbir `@Retryable` yok
+ve proxy-tabanlı `@Transactional` AOP starter'ına ihtiyaç duymaz (çekirdek `spring-aop` zaten
+`spring-context` ile gelir). `OrderServiceRollbackTest`, kaldırma sonrası transaction'ların hâlâ
+doğru rollback yaptığını doğrular. Gerekçelendiremediğin kullanılmayan bir bağımlılık taşımak
+YAGNI/mülakat açısından zayıflıktır.
+
+### 2. Neden atomik koşullu UPDATE değil?
+`UPDATE products SET stock = stock - :q WHERE id = :id AND stock >= :q` en performanslı/sağlam
+seçenek olurdu ama JPA persistence context'ini bypass eder (bellekteki entity bayatlar, `@Version`
+JPA üzerinden artmaz) ve invariant'ı domain modelinden SQL'e geri iter. Tasarımın geri kalanı zengin
+bir JPA domain modeli olduğu ve amaç transaction/locking muhakemesini göstermek olduğu için
+pessimistic locking daha uygun. Atomik UPDATE, çok sayıda farklı ürünlü, yüksek-throughput'lu bir
+production envanter servisinde doğru tercih olurdu.
+
+### 3. Anemic entity yerine zengin domain modeli
+Invariant'lar entity'lerde yaşar: `Product.decreaseStock()` "stok negatif olamaz"ı korur,
+`OrderItem.of()` birim fiyatı snapshot'layıp subtotal'ı hesaplar, `Order` toplam hesabını ve durum
+geçişlerini sahiplenir. Servisler orkestrasyon yapar; iş kuralı tutmaz.
+
+Invariant'ın bypass edilememesi için entity'ler **toptan `@Setter` açmaz** — stok yalnızca
+`decreaseStock`/`changeStockTo` üzerinden değişir, bidirectional geri-referanslar paket-özel
+`setOrder` kullanır; böylece yalnızca `Order` aggregate'i bağlayabilir. (Hibernate alan erişimi
+kullandığı için setter'ları kaldırmak yüklemeyi etkilemez.)
+
+### 4. Transaction sınırı
+`OrderService.createOrder` tek bir `@Transactional`'dır: stok düşürme + sipariş/kalemler + ödeme.
+Herhangi bir hata (yetersiz stok, başarısız ödeme) her şeyi geri sarar — yarım sipariş, değişmiş
+stok yok. Tüm custom exception'lar unchecked'tir; böylece default rollback geçerli olur
+(`rollbackFor` tuzağı yok).
+
+### 5. Paralel işleme & hata izolasyonu
+- `BulkOrderService`, `OrderService`'ten **ayrı bir bean**'dir; `createOrder`'ı Spring proxy'si
+  üzerinden çağırır (self-invocation `@Transactional` proxy'sini bypass ederdi).
+- `processBulkOrders` bilinçli olarak `@Transactional` **değildir**: transaction'lar thread-bound
+  olduğundan her `CompletableFuture` görevi kendi transaction'ını executor thread'inde
+  açar/commit'ler — per-order izolasyon buradan gelir. Bir siparişin rollback'i diğerini etkilemez.
+- `ForkJoinPool.commonPool()` yerine özel, sınırlı bir `ThreadPoolTaskExecutor` (`CallerRunsPolicy`
+  ile) kullanılır; bloklayan JDBC işiyle JVM-wide havuzu aç bırakmamak için.
+- Her görev `createOrder`'ı try/catch içine alır ve per-order sonuç döner; bir hata batch'i
+  durdurmaz.
+
+### 6. Design pattern: ödeme için Strategy + Registry
+Her yöntem için bir implementasyonla `PaymentStrategy`, Spring tarafından `PaymentStrategyRegistry`
+(bir `EnumMap`) içinde otomatik toplanır. Yeni ödeme yöntemi = bir `@Component` eklemek; mevcut kod
+değişmez (Open/Closed). Yöntemlerin davranışı tamamen bağımsız olduğu için Template Method yerine
+seçildi.
+
+### 7. Bulk yanıtı: HTTP 200 + per-item sonuçlar (207 Multi-Status değil)
+Bulk çağrısının kendisi başarılıdır; tekil sipariş sonuçları yapısal bir gövdede taşınan veridir
+(`total/succeeded/failed/results[]`). 207 Multi-Status değerlendirildi ama marjinal semantik kazanç
+için client'ı şaşırtıcı bulunarak reddedildi.
+
+### 8. API olgunluğu & CORS
+- `@RestControllerAdvice` (`ApiError`) ile tutarlı hata sözleşmesi: yetersiz stok → 409, ödeme
+  hatası → 422, bulunamadı → 404, validation / bozuk gövde / tip uyuşmazlığı → 400, beklenmeyen →
+  500. Bozuk JSON ve bilinmeyen enum değerleri yakalanır (`HttpMessageNotReadableException`); böylece
+  client her zaman temiz bir `ApiError` alır, ham stack trace değil.
+- CORS, MVC katmanında (`WebConfig` + `CorsProperties`) **configurable origin'lerle**
+  (`app.cors.allowed-origins`, dev varsayılanı `localhost:5173/3000`) açıktır. Bu, API'yi planlanan
+  test-harness frontend'ine kod değişikliği olmadan hazırlar. Bunun için Spring Security
+  **eklemedik** — düz MVC CORS yeterli (YAGNI); izinsiz bir origin'in preflight'ı doğru biçimde 403
+  ile reddedilir.
+
+### 9. Docker
+Multi-stage `Dockerfile`: bir Maven aşaması jar'ı paketler (bağımlılık katmanı daha hızlı
+yeniden-build için ayrı cache'lenir), slim bir `eclipse-temurin:17-jre` runtime aşaması onu
+root-olmayan kullanıcıyla çalıştırır. `docker-compose.yml` 8080'i expose eder ve **ayrı bir DB
+servisi eklemez** — H2 in-memory olduğundan ayrı bir DB container'ı ölü ağırlık olurdu. Testler imaj
+build'i içinde değil, `mvn test` ile koşar (`-DskipTests`). Uçtan uca doğrulandı:
+`docker compose up --build` container'ı ayağa kaldırır, 8 ürünü yükler ve siparişleri 8080'de servis
+eder.
+
+H2 konsolu varsayılan olarak "remote" client'lara kapalıdır; container'da host tarayıcısı remote
+sayılır. Yerel config'i zayıflatmak yerine compose, `SPRING_H2_CONSOLE_SETTINGS_WEB_ALLOW_OTHERS=true`'yu
+yalnızca container için ayarlar (relaxed-binding override); böylece `application.yml` yerelde güvenli
+`false` varsayılanını korur.
+
+### 10. Test harness (statik frontend) + destekleyici uçlar
+`src/main/resources/static/` altındaki vanilla-JS panel 8080'de same-origin servis edilir (ayrı
+sunucu yok, CORS yok). JUnit testlerini tek-tık senaryo butonları olarak yansıtır (happy path,
+stok/ödeme rollback'leri, 500-sipariş eşzamanlılığı, deadlock-freedom, paralel bulk, hata matrisi).
+İki küçük backend eklemesi bunu destekler: koşular arası stoğu sıfırlamak için
+`PATCH /api/products/{id}/stock` ve configurable bir `app.payment.credit-card-limit` (varsayılan
+10000) — limiti aşan kredi kartı siparişi `PaymentResult.failure` döndürerek mevcut 422 + rollback
+akışını canlı tetikler (banka havalesi ve kripto limitsiz kalır, büyük/eşzamanlı testlerde kullanılır).
+Çalışan Docker container'ına karşı gerçek paralel HTTP ile (`xargs -P`) uçtan uca doğrulandı: stok=10
+ürüne 60 eşzamanlı sipariş → tam 10 × 201 + 50 × 409, son stok 0; 100 ters-sıralı eşzamanlı sipariş →
+hepsi 201, deadlock yok.
+
+### 11. Teslim öncesi temizlik
+Modeli yalın tutmak için ölü kod kaldırıldı: kullanılmayan `Order` metotları `markFailed()`,
+`isPaid()`, `removeItem()` ve hiç üretilmeyen enum değerleri (`OrderStatus.FAILED/CANCELLED`,
+`PaymentStatus.PENDING/FAILED/REFUNDED`) — yalnızca akışın gerçekten ürettiği değerler bırakıldı
+(`OrderStatus{PENDING,CONFIRMED}`, `PaymentStatus{COMPLETED}`). Başarısız siparişler persist
+edilmeyip rollback olduğu için bu başarısızlık durumları gerçekten erişilemezdi.
+
+## Yerel ortam notu (proje kararı değil)
+Geliştirme makinesinde proje yolu ASCII-dışı bir karakter içeriyor (`...\Masaüstü\...`); bu,
+`mvn spring-boot:run` ve Surefire'ın kullandığı forklanan JVM'i bozuyor ("Could not find or load
+main class"). Yerelde uygulamayı doğrudan `java -cp` ile, testleri `mvn test -DforkCount=0` ile
+çalıştırıyoruz. Normal bir yolda dokümante edilen tek komutlar (`mvn spring-boot:run`, `mvn test`)
+olduğu gibi çalışır.

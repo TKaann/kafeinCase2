@@ -29,9 +29,23 @@ Uygulama `http://localhost:8080` üzerinde ayağa kalkar ve açılışta **8 ör
 mvn test
 ```
 
-36 test koşar (birim + integration + eşzamanlılık + MockMvc). Tümü deterministiktir; race
+39 test koşar (birim + integration + eşzamanlılık + MockMvc). Tümü deterministiktir; race
 condition testleri `CountDownLatch` ile kurgulanmıştır, `Thread.sleep` veya log'a bağımlılık
 yoktur.
+
+> **Windows / ASCII-dışı klasör yolu notu.** Yukarıdaki iki komut normal bir klonda olduğu gibi
+> çalışır. Ancak proje yolu ASCII-dışı karakter içeriyorsa (ör. Türkçe karakterli
+> `...\Masaüstü\...`), `mvn spring-boot:run` forklanan JVM'in classpath argfile'ı bozulduğu için
+> başlatılamaz ("Could not find or load main class"). Çalışan alternatif — paketleyip jar'ı
+> doğrudan çalıştır:
+> ```bash
+> mvn clean package -DskipTests
+> java -jar target/order-service-0.0.1-SNAPSHOT.jar
+> ```
+> Surefire de forklandığı için testleri fork'suz çalıştır:
+> ```bash
+> mvn test -DforkCount=0
+> ```
 
 ## Docker ile çalıştırma
 
@@ -183,6 +197,26 @@ curl -X POST http://localhost:8080/api/orders \
   -H "Content-Type: application/json" \
   -d '{"customerId":7,"paymentMethod":"CRYPTO","items":[{"productId":2,"quantity":5},{"productId":8,"quantity":100}]}'
 # -> 409 Conflict; ardından GET /api/products ile Mouse stoğunun HÂLÂ 200 olduğunu doğrulayın.
+```
+
+**Elle doğrulama (Windows PowerShell):** PowerShell'de `curl`, `Invoke-WebRequest`'in takma adıdır
+(`-X` gibi bayrakları tanımaz) ve `Invoke-RestMethod` hata gövdesini güvenilir göstermez. Bu yüzden
+`curl.exe` kullanın ve JSON'u bir dosyaya yazın:
+```powershell
+# JSON'u dosyaya yaz (tırnak derdi olmasın)
+'{"customerId":7,"paymentMethod":"CRYPTO","items":[{"productId":2,"quantity":5},{"productId":8,"quantity":100}]}' | Out-File -Encoding ascii body.json
+
+# -i = durum satırı (409) + gövde birlikte
+curl.exe -s -i -X POST http://localhost:8080/api/orders -H "Content-Type: application/json" --data "@body.json"
+
+# rollback kanıtı: stok hâlâ 200 olmalı
+(Invoke-RestMethod http://localhost:8080/api/products/2).stockQuantity
+```
+
+**Otomatik testleri terminalden koşturma** (yukarıda adı geçen iki test, tek komut — PowerShell'de
+virgülün tanınması için `-Dtest` tırnak içinde):
+```powershell
+mvn test -DforkCount=0 "-Dtest=OrderServiceRollbackTest,MultiItemOrderTest"
 ```
 
 ## Eşzamanlılık (race condition) senaryosunu test etme
