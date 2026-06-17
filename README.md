@@ -201,17 +201,34 @@ curl -X POST http://localhost:8080/api/orders \
 
 **Elle doğrulama (Windows PowerShell):** PowerShell'de `curl`, `Invoke-WebRequest`'in takma adıdır
 (`-X` gibi bayrakları tanımaz) ve `Invoke-RestMethod` hata gövdesini güvenilir göstermez. Bu yüzden
-`curl.exe` kullanın ve JSON'u bir dosyaya yazın:
+`curl.exe` kullanın ve JSON'u bir dosyaya yazın. Her iki rollback tetikleyicisi için birer örnek:
+
 ```powershell
-# JSON'u dosyaya yaz (tırnak derdi olmasın)
+# 1) Stok kaynaklı rollback (MultiItemOrderTest'in canlı karşılığı):
+# Mouse(id=2) x5 (geçerli) + Pen(id=8) x100 (stok aşımı) → yetersiz stok (409)
 '{"customerId":7,"paymentMethod":"CRYPTO","items":[{"productId":2,"quantity":5},{"productId":8,"quantity":100}]}' | Out-File -Encoding ascii body.json
 
 # -i = durum satırı (409) + gövde birlikte
 curl.exe -s -i -X POST http://localhost:8080/api/orders -H "Content-Type: application/json" --data "@body.json"
 
-# rollback kanıtı: stok hâlâ 200 olmalı
+# rollback kanıtı: Mouse stoğu hâlâ 200 olmalı
 (Invoke-RestMethod http://localhost:8080/api/products/2).stockQuantity
 ```
+
+```powershell
+# 2) Ödeme kaynaklı rollback (OrderServiceRollbackTest'in canlı karşılığı):
+# Laptop(id=1) x7 = 10.499,93 > 10.000 kredi kartı limiti → ödeme reddi (422)
+'{"customerId":7,"paymentMethod":"CREDIT_CARD","items":[{"productId":1,"quantity":7}]}' | Out-File -Encoding ascii body.json
+
+curl.exe -s -i -X POST http://localhost:8080/api/orders -H "Content-Type: application/json" --data "@body.json"
+
+# rollback kanıtı: Laptop stoğu hâlâ 25 olmalı
+(Invoke-RestMethod http://localhost:8080/api/products/1).stockQuantity
+```
+
+> **Not (dürüst):** `OrderServiceRollbackTest` testin içinde ödemeyi `@MockBean` ile patlatır;
+> yukarıdaki 2. manuel örnek ise aynı ödeme-patlaması + rollback'i gerçek kredi kartı limiti
+> aşılarak tetikler. Davranış aynı (422 + stok geri sarılır), yalnızca tetikleme farklı.
 
 **Otomatik testleri terminalden koşturma** (yukarıda adı geçen iki test, tek komut — PowerShell'de
 virgülün tanınması için `-Dtest` tırnak içinde):
