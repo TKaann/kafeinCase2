@@ -1,0 +1,1353 @@
+Bu konuşmada seni senior Java/Spring Boot software architect olarak kullanmak istiyorum.
+
+Bir iş başvurusu kapsamında bana verilen Spring Boot case'ini geliştireceğim. Bu süreçte amacım sadece çalışan bir proje üretmek değil; concurrency, transaction management, design patterns, test stratejileri ve mimari kararlar açısından güçlü bir çözüm ortaya çıkarmak.
+
+Önemli:
+
+İlk aşamada kod yazmanı istemiyorum.
+Önce case'i analiz etmeni istiyorum.
+Eleştirel düşün.
+Farklı çözüm alternatiflerini değerlendir.
+Gerektiğinde önerilerine karşı çık ve riskleri belirt.
+Amacın bana doğrudan kod vermek değil, doğru mühendislik kararlarını almamda yardımcı olmak.
+
+Pdf olarak gönderdiğim sase'i detaylı şekilde incele.
+
+Analiz sonucunda aşağıdaki başlıklarda geri dönüş yap:
+
+Bu case'in asıl ölçmek istediği teknik yetkinlikler nelerdir?
+Değerlendiricilerin en çok dikkat edeceği noktalar nelerdir?
+Adayların en sık hata yapacağı yerler nerelerdir?
+Concurrency tarafında hangi riskler bulunuyor?
+Transaction yönetiminde hangi riskler bulunuyor?
+Design Pattern tarafında hangi yaklaşım en uygun görünüyor?
+Bu case için nasıl bir domain modeli önerirsin?
+Nasıl bir katmanlı mimari önerirsin?
+Bu case için profesyonel seviyede bir geliştirme planı çıkar.
+Projeye başlamadan önce verilmesi gereken kritik teknik kararları listele.
+
+Henüz kod üretme.
+
+Önce sadece analiz, mimari değerlendirme ve geliştirme planı oluştur.
+
+-
+
+Antigravity ile opus kullanarak aynı bu prompt'u girdim ve bu md dosyasını oluşturdu ve sonrasında verdiği kararları da biraz konuştum, tartıştım, nedenlerini sordum. Sonrasında kafeinCase2 klasörü içine Faz0 ve Faz1 geliştirmelerini yapmasını söyledim şu anda bu geliştirmeleri yaptı. sırada Faz2 geliştirmesini yapmasını istiyordum ama orada limitim bittiği için artık Cloude Pro (yani seninle) devam edeceğim. senden istediğim şey şu anda hem case'i incelemen hem de önceki claudenin çıkardığı bu md dosyasını incelemen ve orada olanlarda düzeltmen gerken bir şey var mı ya da eklemen gereken bir şey var mı onlara bakman. Sonrasında yazdığmız Faz0 ve Faz1 kodlarını inceleyip oralarda yapılması gereken bir şeyler var mı ona bakman. SOLID prensiplerine uygun şekilde yazılmasına önem gösterelim ve bu ana kadar yazdığımız kodları inceleyip projede hangi aşamada olduğumuzu anlamanı istiyorum. İnceleyip anladıktan sonra proje için Faz2 aşamasına geçmeni istiyorum senden.
+
+Eğer anlamadığın veya takıldığın bir yer olursa bana sor ben seni yönlendiririm.
+
+I'll start by understanding the full picture: the actual case requirements (PDF), the existing analysis doc (already read), and the Faz0/Faz1 code already written. Let me gather these in parallel.
+
+
+Read a file, ran a command, found files
+The PDF needs text extraction. Let me read the existing code and extract the PDF text in parallel.
+
+
+Read 5 files
+Let me read the enums and config files, and extract the PDF text.
+
+
+Read 5 files, found files, ran a command
+Now I need to read the actual case PDF. Let me extract its text.
+
+
+Ran 3 commands, read a file
+I now have the complete picture: the actual case PDF, the analysis doc, and all Faz0/Faz1 code. Let me verify the project compiles cleanly before building on it, then clean up the temp file.
+
+Ran
+Compile project to verify current state
+Proje temiz derleniyor. Her şeyi inceledim — case PDF'i, analiz dokümanı ve tüm Faz0/Faz1 kodu. Değerlendirmem aşağıda.
+
+1. Şu an neredeyiz? (Gerçek durum)
+Plandaki "Faz 1" aslında kısmen tamamlanmış:
+
+Yapılan	Durum
+Faz 0: pom.xml, application.yml, @SpringBootApplication + @EnableRetry	✅ Tam
+Faz 1: 3 enum + 4 entity (Product, Order, OrderItem, Payment)	✅ Yazılmış
+Faz 1: Repository'ler	❌ Yok
+Faz 1: DataInitializer (örnek ürünler)	❌ Yok
+Yani plandaki Faz 1'in checklist'inin son 3 maddesi (repository, data initializer, "H2 console'dan veri görünüyor mu?") henüz yapılmamış. Faz 2'ye geçmeden bunları tamamlamamız gerekiyor — onlar Faz 2'nin önkoşulu zaten.
+
+2. Case ↔ Analiz dokümanı: düzeltmeler & eklemeler
+Doküman genel olarak çok sağlam. Ama gözden geçirince dikkat edilmesi gereken birkaç nokta var:
+
+⚠️ Düzeltme 1 — Bu bir JUNIOR case'i, doküman SENIOR gibi yazılmış
+PDF başlığı: "Junior Spring Boot Developer — Teknik Ödev". Doküman ise Saga, ApplicationEventPublisher + @Async event-driven notification, MapStruct, HTTP 207 Multi-Status gibi senior-seviye öneriler içeriyor. Bunların çoğu savunulabilir ama over-engineering riski taşır — ve case'in kendisi *"pattern for pattern's sake"*i açıkça olumsuz değerlendiriyor. Önerim: 3 odak alanını (paralellik, transaction, design pattern) kusursuz yap, gerisinde sadeliği koru. Notification = basit log.info(), event-driven değil. Bu bir kayıp değil; bilinçli sadelik artı puandır.
+
+⚠️ Düzeltme 2 — En kritik teknik hata dokümanda eksik: @Retryable + @Transactional sıralaması
+Doküman "Spring Retry kullan" diyor ama en sık yapılan ve en sinsi hatayı atlamış: retry, transaction'ı dıştan sarmalı. Eğer @Retryable ve @Transactional aynı metodda olursa, retry başarısız transaction'ın içinde tekrar dener → OptimisticLockException zaten transaction'ı kirletmiştir, retry hiçbir işe yaramaz. Doğru yapı:
+
+processOrderWithRetry()   → @Retryable (transaction YOK)
+   └── processOrder()     → @Transactional (ayrı bean/sınıf, proxy üzerinden)
+Bu, Faz 2/3'te kodu doğru bölmemizi belirleyen kritik bir karar. Dokümana eklenmeli.
+
+⚠️ Düzeltme 3 — Locking stratejisi: test senaryosu optimistic'e karşı çalışıyor
+Doküman "Optimistic + Retry" öneriyor (ve mevcut kod buna göre kurulmuş: spring-retry, @EnableRetry, @Version). Ama değerlendirici şunu yapacak: "aynı tek ürüne 100 eşzamanlı istek." Bu, tek bir hot row demek. Optimistic locking bu senaryoda retry storm üretir — istekler birbirini sürekli ezer, çoğu birkaç kez retry'lar, yüksek contention'da retry-exhaustion gerçek bug gibi görünebilir. Bu, case'in tam da test edeceği noktada en kırılgan yaklaşım. Bunu aşağıda ayrı bir soru olarak soracağım çünkü Faz 2'nin stok-düşürme kodunu doğrudan belirliyor.
+
+✅ Doğru olan ve korunması gereken kararlar
+BigDecimal (Double değil) — doğru.
+unitPrice snapshot OrderItem'da — doğru.
+Customer entity yok, customerId yeterli — pragmatik, doğru.
+Custom unchecked exception'lar (rollbackFor tuzağından kaçınmak için) — doğru.
+Deadlock önleme: ürünleri ID sırasıyla kilitle — doğru ve önemli.
+3. Faz0/Faz1 kod incelemesi (SOLID odaklı)
+🔴 En önemli: Anemic Domain Model (dokümanın kendi "Hata #7"si)
+Entity'ler şu an saf veri taşıyıcı (@Getter/@Setter + hiç davranış yok). Dokümanın kendisi bunu hata olarak işaretlemiş ama kod tam da o hatayı yapıyor. SOLID/DDD açısından invariant'lar entity'de yaşamalı:
+
+Product.decreaseStock(int qty) → stock < qty ise InsufficientStockException fırlatır. Stok asla < 0 olamaz kuralı burada korunmalı, service'te değil.
+OrderItem → subtotal = unitPrice × quantity hesabı entity'de (factory metot).
+Order.calculateTotal() / markConfirmed() / markFailed() → durum geçişleri entity'de.
+Bunu Faz 2'de düzelteceğiz; service "ince orkestratör", entity "kuralların sahibi" olacak.
+
+🟡 Orta öncelikli nitler
+precision = 38, scale = 2 — 38 H2'nin maksimumu, alışılmadık. 19, 2 daha standart (para için fazlasıyla yeter). Kozmetik.
+application.yml logging satırı eski — org.hibernate.type.descriptor.sql.BasicBinder Hibernate 5 yolu. Spring Boot 3.3 = Hibernate 6 → doğrusu org.hibernate.orm.jdbc.bind: TRACE. Kırmıyor ama parametre binding logları görünmüyor.
+Payment.transactionReference nullable=false + processedAt default now() — PENDING bir payment için referans henüz yokken constraint ihlali olabilir. Akışta payment'i sadece COMPLETED + referanslı kaydedeceksek sorun yok; karar netleşmeli.
+@Setter + @AllArgsConstructor + @Builder JPA entity'de — bilinen anti-pattern kombinasyonu ama case için kabul edilebilir. İyi haber: @Data/@EqualsAndHashCode/@ToString kullanmamışlar → bidirectional ilişkide sonsuz döngü yok. Doğru karar.
+✅ İyi yapılmışlar
+@Version Product'ta var.
+Order'da addItem/removeItem bidirectional helper'lar var.
+Enum'lar @Enumerated(STRING) ile — DB'de okunabilir, ordinal değil. Doğru.
+pom.xml temiz: retry + aop + validation + lombok eksiksiz.
+4. Faz 2'ye geçmeden önce tek kritik karar
+Geri kalan her şeye (repository'ler, domain-rich entity'ler, notification = log, exception tasarımı) ben karar verip ilerleyebilirim. Ama locking stratejisi senin vereceğin, tüm concurrency tasarımını belirleyen karar — ve mevcut kod bir yöne kurulmuşken test senaryosu başka yöne işaret ediyor. Bunu sana sormam lazım:
+
+Asked
+Locking
+Stok tutarlılığı için hangi locking stratejisini kullanalım? (Değerlendirici 'tek ürüne 100 eşzamanlı istek' atacak — yani tek hot row.)
+
+Peki sen ne önerirsin burada, bu case ve test senaryoları göz önüne alındığında hangisini yapmamız doğru olur? Nedeniyle ve avantaj dezavantajıyla birlikte açıklar mısın?
+
+mvn compile temiz geçti — Faz0/Faz1 sağlam zemin. Şimdi sorduğun "sen ne önerirsin" sorusuna net cevap:
+
+Önerim: Pessimistic Write Lock (birincil) + @Version (yedek savunma)
+Neden — test senaryosu üzerinden düşünelim
+Değerlendirici tek bir ürüne 100 eşzamanlı istek atacak. Üç yaklaşımın bu tam senaryodaki davranışı:
+
+Yaklaşım	100 istek / tek row davranışı	Test deterministik mi?	Hata tipi
+Pessimistic (öneri)	DB satır kilidi; istekler sırayla geçer, stok bitince kalanı "yetersiz stok" alır	✅ Evet	Doğru iş hatası (InsufficientStock)
+Optimistic + Retry	Her turda 1 kazanır, 99 OptimisticLockException → retry. maxAttempts=3 ile çoğu tükenip false-fail olur	❌ Flaky	Lock hatası (bug gibi görünür)
+Atomik UPDATE	Tam concurrent, oversell imkânsız, en hızlı	✅ Evet	Doğru iş hatası
+Pessimistic'in avantajları (bu case için)
+Doğru hata semantiği: Stok bitince kullanıcı "yetersiz stok" görür — OptimisticLockException değil. Değerlendirici tam da bunu bekliyor: "bazıları başarılı, kalanı nedeniyle başarısız."
+Deterministik test: CountDownLatch ile 50 thread → başarılı×miktar + kalan stok == başlangıç assertion'ı her seferinde tutar. CI'da flaky değil.
+Retry mantığı gerekmez: @Retryable/@Transactional proxy sıralama tuzağı (Düzeltme 2) tamamen ortadan kalkar — daha az kod, daha az hata yüzeyi.
+Sözlü savunması kolay: "Tek hot row'da serialize etmek istedim, retry storm istemedim, ID sırasıyla kilitleyip deadlock'u da önledim." — temiz bir senior-vari anlatım.
+Dezavantajları (ve neden bu case'te önemsiz)
+Düşük throughput (serialize): Doğru, ama tek üründe zaten serialize etmek zorundasın — oversell olmaması demek bu. Çok-ürünlü gerçek sistemde farklı ürünler paralel kalır.
+Deadlock riski (çok-ürünlü sipariş): Ürünleri artan ID sırasıyla kilitleyerek tamamen önlüyoruz.
+DB connection tx boyunca tutulur: H2 + bu ölçekte tamamen önemsiz.
+Neden atomik UPDATE değil (daha hızlı olsa da)
+En sağlamı o, ama JPA dirty-checking'i bypass eder, entity/@Version senkronizasyonu manuel olur ve junior case'inde transaction/locking anlayışını daha az gösterir. Pessimistic lock, "race condition'ı anlıyorum"u daha okunaklı kanıtlar.
+
+Bonus — AI şeffaflığı açısından kazanç
+Önceki Claude optimistic+retry kurmuştu. Buradan pessimistic'e geçmek, case'in özellikle ödüllendirdiği şeyin kanıtı: "AI'ın bir önerisini sorguladım, test senaryosuna karşı zayıf olduğunu gördüm, gerekçeyle düzelttim." Bu README'de birinci sınıf bir anlatı. @Version'ı silmiyoruz — ucuz bir ikinci savunma katmanı olarak Product'ta kalsın; spring-retry bağımlılığını ise dormant bırakırız (zarar yok).
+
+Bu temelde Faz 2'yi şimdi kuruyorum. Kapsam: Faz 1 kalanı (repository'ler + DataInitializer) + domain-rich entity refactor + exception'lar + Payment Strategy alt sistemi + transactional createOrder + Product listeleme & Order POST. Başlıyorum.
+
+Faz 2 implementation
+Önce exception'lar ve Payment Strategy alt sistemi:
+
+
+Created 4 files
+Şimdi Payment Strategy alt sistemi (Strategy + Registry pattern):
+
+
+Created 6 files
+Repository'ler — ProductRepository'de pessimistic lock query:
+
+
+Created 3 files
+Şimdi domain davranışını entity'lere taşıyorum (anemic model düzeltmesi). Önce Product:
+
+Edited
+Product.java
++17
+-0
+Şimdi OrderItem factory metodu ve Order davranışları:
+
+
+Edited 4 files
+Şimdi Order'a domain davranışı (toplam hesabı, durum geçişleri, payment bağlama):
+
+Edited
+Order.java
++26
+-0
+Şimdi servis katmanı — NotificationService, PaymentService, ProductService:
+
+
+Created 3 files
+OrderService — transaction'ın kalbi. Önce service-seviye command nesnesi (web DTO'suna bağımlılığı önlemek için), sonra orchestration:
+
+
+Created 2 files
+Web katmanı — request/response DTO'ları (validation ile):
+
+
+Created 5 files
+Mapper'lar (manuel, şeffaf):
+
+
+Created 2 files
+Controller'lar:
+
+
+Created 2 files
+Hata yönetimi — minimal ama olgun GlobalExceptionHandler (Faz 4'te genişletiriz, ama happy/sad path'i şimdi test edilebilir kılıyor):
+
+
+Created 2 files
+Son olarak DataInitializer (Faz 1 kalanı — uygulama açılışında örnek ürünler):
+
+Created
+DataInitializer.java
++53
+-0
+application.yml'deki eski Hibernate 5 logging satırını düzeltiyorum:
+
+Edited
+application.yml
++1
+-1
+Şimdi derleyip doğrulayalım:
+
+Ran
+Compile Faz2 code
+Derleme temiz. Şimdi uygulamayı gerçekten ayağa kaldırıp happy path + rollback'i doğrulayalım:
+
+
+Ran 2 commands
+Offline modda spring-boot:run plugin'in ek bağımlılıklarını indiremiyor (sandbox offline). Online deneyelim:
+
+
+Ran 2 commands
+Sınıflar derlendi. Şimdi uygulamayı düzgün ayağa kaldırıp endpoint'leri test edelim:
+
+
+Ran 2 commands, read a file
+Sorun belli: OneDrive yolundaki Türkçe karakter (Masaüstü) fork edilen JVM'in classpath'inde bozuluyor (logda Masa st ). fork=false ile aynı JVM'de çalıştırıp bunu aşalım:
+
+
+Ran 2 commands
+spring-boot:run plugin'i bu Türkçe-karakterli OneDrive yolunda forklu/forksuz çalışmıyor. Maven plugin'ini atlayıp java'yı doğrudan classpath ile çağırayım:
+
+
+Ran 3 commands
+Uygulama ayağa kalktı, 8 ürün yüklendi, jdbc.bind logları da çalışıyor (Hibernate 6 düzeltmesi doğrulandı). Şimdi endpoint'leri test edelim — happy path, rollback ve detay:
+
+Ran
+Test product list and happy-path order
+Happy path mükemmel — toplam doğru (2999.98+29.90=3029.88), stok düştü. Şimdi kritik rollback testi: aynı siparişte geçerli bir kalem (Mouse) + stok aşan bir kalem (Pen ×100). Tüm transaction geri sarmalı; geçerli kalemin stoğu bile değişmemeli:
+
+Ran
+Test rollback, validation, detail, not-found
+Faz 2 doğrulandı — hepsi geçti. En kritik kanıt (rollback): Pen×100 stok aşınca 409 döndü ve aynı siparişteki geçerli kalem Mouse'un stoğu 199'da kaldı — tüm transaction atomik olarak geri sarıldı. Detay GET'i de LazyInitializationException vermeden çalıştı (EntityGraph). Uygulamayı durdurup temizleyelim:
+
+Ran
+Stop app and clean temp files
+Faz 2 tamam ve uçtan uca doğrulandı. Bu oturumda öğrendiğim iki kalıcı bilgiyi (Türkçe yol nedeniyle çalıştırma workaround'u ve locking kararı) hafızaya kaydedeyim:
+
+
+Recalled a memory, saved 3 memories
+Faz 2 tamamlandı ve uçtan uca doğrulandı. Özet:
+
+Bu oturumda yapılanlar
+1. Case + analiz dokümanı incelemesi — 3 önemli düzeltme tespit ettim: (a) bu bir junior case'i, doküman senior-seviye over-engineering içeriyor; (b) dokümanda eksik olan en kritik tuzak: @Retryable+@Transactional proxy sıralaması; (c) locking stratejisi test senaryosuna karşı yeniden değerlendirildi → pessimistic lock seçtik (gerekçesini detaylı anlattım).
+
+2. Faz0/Faz1 kod incelemesi — en önemli bulgu anemic domain model'di (dokümanın kendi "Hata #7"si). Düzelttim: invariant'lar artık entity'lerde.
+
+3. Faz 1'in eksik kalan kısmı tamamlandı — repository'ler + DataInitializer (8 örnek ürün).
+
+4. Faz 2 implementasyonu (SOLID odaklı):
+
+Katman	Dosyalar
+Domain davranışı	Product.decreaseStock(), OrderItem.of(), Order.recalculateTotal/markConfirmed/attachPayment
+Payment (Strategy+Registry)	PaymentStrategy + 3 impl + PaymentStrategyRegistry (OCP: yeni yöntem = yeni @Component)
+Repository	ProductRepository.findByIdForUpdate (PESSIMISTIC_WRITE), OrderRepository (EntityGraph)
+Service	OrderService.createOrder (tek @Transactional, ID-sıralı kilit → deadlock önleme) + Product/Payment/Notification
+API	Controller'lar, DTO'lar, manuel mapper'lar, GlobalExceptionHandler
+5. Çalıştırma + doğrulama (gerçek HTTP testleri):
+
+✅ Happy path → 201, doğru toplam, stok düştü
+✅ Rollback (kritik): stok-aşan kalem → 409 ve aynı siparişteki geçerli kalemin stoğu bile değişmedi → atomic rollback kanıtlandı
+✅ Validation 400, detay 200 (lazy-init hatası yok), not-found 404
+Not: Bu makinede mvn spring-boot:run Türkçe yol (Masaüstü) yüzünden bozuluyor; java -cp ile doğrudan çalıştırdım. README'ye normal mvn spring-boot:run komutunu yazacağız (değerlendiricinin yolunda sorun olmaz), ama bunu hatırlamak için not aldım.
+
+Sırada: Faz 3 — Concurrency
+Bir sonraki adım çoklu paralel sipariş endpoint'i (CompletableFuture + bounded ThreadPoolTaskExecutor), her sipariş için bağımsız sonuç objesi, exception izolasyonu ve CountDownLatch'li stok-tutarlılığı testi. Pessimistic lock seçtiğimiz için burada retry mantığına gerek kalmayacak — tasarım sadeleşiyor.
+
+İki küçük sorum/önerim var:
+
+Masaüstündeki case_analysis.md'yi yukarıdaki 3 düzeltmeyle (junior notu, @Retryable tuzağı, pessimistic locking kararı) güncelleyeyim mi, yoksa doküman olduğu gibi kalsın, kararları sadece README'de mi toplayalım?
+Faz 3'e şimdi geçeyim mi, yoksa önce Faz 2 kodunu sen mi gözden geçirmek istersin?
+md dosyasını düzeltmene gerek yok, README de değiniriz bunlara. Kodu önce ben gözden geçireyim, ben onay verince Faz 3 e geçelim. 
+Sormak istediğim bir soru var stok tutarlılığı için Atomik Update kullanmadık? Fazla mı olurdu yani over engineering durumu mu olurdu yoksa daha mı kötü olurdu? Yoksa bizim sistemimize mi uymazdı? neden pessimistic ve optimistic ile ilerledik burada da Atomik ile ilerlemedik bunu cevaplar mısın.
+
+Çok yerinde bir soru — ve net cevabı şu: Atomik UPDATE over-engineering değildi, hatta saf performans/güvenlik açısından üçü içinde en iyisiydi. Ama bizim çözümün mimarisine ve case'in ölçtüğü şeye pessimistic'ten daha kötü uyuyordu.
+
+Önce küçük bir düzeltme: biz aslında pessimistic ile ilerledik; optimistic (@Version) sadece ucuz bir ikinci savunma katmanı olarak dormant duruyor, birincil mekanizma o değil. Yani gerçek seçim "pessimistic mi, atomik mi" idi.
+
+Atomik UPDATE nedir, neden bu kadar iyi?
+UPDATE products SET stock = stock - :qty WHERE id = :id AND stock >= :qty
+Tek satır. Veritabanı bunu tek atomik işlem olarak yapar: ya stock >= qty'dir ve düşer (1 satır etkilenir), ya değildir ve hiç dokunmaz (0 satır). Oversell fiziksel olarak imkânsız, lock tutmaz, tam concurrent, en hızlısı. Korkutucu görünür ama aslında en sade ve en bulletproof olanı.
+
+O zaman neden seçmedik? 4 gerçek neden (hiçbiri "daha kötü çalışır" değil)
+1. JPA persistence context'ini bypass eder — entity yalan söyler.
+@Modifying @Query ile çalışan UPDATE doğrudan DB'ye gider. Elindeki managed Product nesnesinin stockQuantity alanı hâlâ eski değeri gösterir, @Version JPA üzerinden artmaz. Düzeltmek için clearAutomatically=true/flushAutomatically=true + gerekirse yeniden okuma gerekir. "İki ayrı doğruluk kaynağı" (DB gerçeği vs. bellekteki bayat entity) sinsi bug üretir.
+
+2. Az önce kurduğumuz rich domain model'i geri bozar.
+Daha yeni invariant'ı entity'ye taşıdık: Product.decreaseStock() kuralı kendi içinde tutuyor ve InsufficientStockException fırlatıyor. Atomik UPDATE bu kuralı tekrar SQL'e/repository'ye iter; entity kendi kuralını koruyamaz, "etkilenen satır == 0 → throw" kontrolünü service'e yazarsın. Bu, tam da kaçındığımız anemic model yönüdür. Yani çözümün geri kalanının SOLID/DDD duruşuyla çelişir.
+
+3. Case'in ölçtüğü şeyi daha az gösterir.
+Case açıkça "transaction yönetimini ve race condition'ı anlıyor musun" diye bakıyor. Atomik UPDATE tüm sorunu DB motoruna devreder — doğru ama "DB hallediyor" cevabıdır. Pessimistic lock ise locking, isolation, lock ordering ile deadlock önleme üzerine düşündüğünü gösterir; mülakatta "burada neden bu yolu seçtin" sorusuna anlatacak çok daha zengin malzeme verir. Junior pozisyonunda yetkinlik kanıtlamak için bu daha değerli.
+
+4. Aslında işi azaltmaz, hibrit'e zorlar.
+Atomik UPDATE sadece stoğu çözer. Sipariş + ödeme + rollback bütünlüğü için yine de etrafına @Transactional koymak zorundasın. Sonuçta "stok için atomik UPDATE + gerisi için transaction" diye iki ayrı zihinsel model taşırsın. Pessimistic'te ise tek model var: "hepsini kilitle, işi yap, commit/rollback" — daha homojen.
+
+Özet karar tablosu
+Pessimistic (seçtiğimiz)	Atomik UPDATE
+Oversell güvenliği	✅	✅ (en sağlam)
+Performans (tek hot row)	İyi	En iyi
+Entity bellek tutarlılığı	✅ Senkron	❌ Bayat kalır
+Rich domain model uyumu	✅	❌ Kuralı SQL'e iter
+Case'in ölçtüğünü gösterme	✅ Yüksek	Düşük ("DB halleder")
+Anlatım/savunma kolaylığı	✅	Orta
+Atomik UPDATE ne zaman doğru seçim olurdu? Yüksek throughput + çok farklı ürün + entity'nin bellek durumuna ihtiyaç duymadığın gerçek ölçekli bir production envanter servisi. Orada row-lock contention ve connection tutma maliyeti gerçek olur, atomik UPDATE parlar. Bizim senaryoda (H2 in-memory, test tek ürünü dövüyor, amaç yetkinlik göstermek) avantajları hiç ortaya çıkmıyor, dezavantajları ise çıkıyor.
+
+Yani: kötü değil, fazla da değil — sadece farklı bir felsefe (doğruluğu DB'ye it) ve bizim çözümün felsefesi (doğruluğu domain + transaction'da modelle) ile uyuşmuyor. İyi haber: bunu README'de "değerlendirilen alternatif" olarak yazmak başlı başına artı puan — eleştirel düşündüğünü gösterir.
+
+Faz 3'e geçmeden kodu incelemeni bekliyorum; onay verince başlarım.
+
+Faz 4'ü gözden geçirdim — Product GET /{id}, HTTP kod matrisi (409/422/404/400/500 tek tip ApiError ile), validation ve configurable CORS hepsi yerinde, temiz. Onaylıyorum, Faz 5'e geçebilirsin.
+
+Faz 5'i planladığın gibi yap: Strategy/Registry unit testleri, tekil sipariş rollback'inin mock'la testi (örn. ödeme patlayınca stok geri alınıyor mu / order kaydedilmiyor mu), mapper testleri. Üç odak alanı (stok yarışı, paralel izolasyon, yetersiz stok) zaten kapsanmış; burada onların dışındaki kapsamı tamamla. Testler deterministik ve hızlı olsun, gereksiz @SpringBootTest ağırlığından kaçın — saf birim testlerde mockito yeterli, context gerektirmeyenleri context'siz yaz.
+
+İki küçük ek:
+
+spring-retry / spring-aop: retry'ı kullanmama kararı verdik (AI_NOTES'ta dormant diye geçiyor). pom.xml'de gerçekten gerekli mi değerlendir — kullanılmıyorsa kaldırıp bağımlılıkları sadeleştir, kalacaksa nedenini netleştir. Kararını bana söyle.
+Yeni testler verbose SQL/trace loglarına bağımlı olmasın; test loglarını gereksiz kirletme.
+Senior + SOLID + YAGNI/KISS dengesini koru. Faz 5'i uygula, bitince birlikte gözden geçirip Faz 6 onayını vereceğim.
+
+Onay alındı. Önce bağımlılık kararı, sonra Faz 5 testleri.
+
+spring-retry / spring-aop kararı: kaldırıyorum
+İnceledim:
+
+Kod tabanında hiçbir @Retryable yok; pessimistic lock'a geçince retry'a gerek kalmadı. @EnableRetry boşta duruyor.
+spring-boot-starter-aop (AspectJ) yalnızca @Aspect/@Async self-invocation gibi senaryolar için gerekir — bizde yok. Kritik nokta: @Transactional proxy'si bu starter'a bağlı değil; çekirdek spring-aop zaten spring-context ile (data-jpa starter üzerinden) geliyor. Yani ikisini de kaldırınca transaction çalışmaya devam eder.
+Karar: spring-retry + spring-boot-starter-aop kaldır, @EnableRetry sil. Dormant bağımlılık taşımak YAGNI'ye aykırı; "ne işe yaradığını açıklayamadığın dependency" mülakatta zayıflık. Ve rollback testi bunu kanıtlayacak: starter-aop olmadan da @Transactional rollback çalışıyor. (AI_NOTES'taki "dormant" notunu da "kaldırıldı"ya güncelleyeceğim.)
+
+
+Edited 2 files
+Şimdi test log kirliliğini önlemek için test profili, sonra testler. Faz 5 kapsamı: domain invariant testleri (Product/OrderItem), payment strategy + registry + service, mapper'lar (hepsi context'siz, saf Mockito/JUnit), ve tekil rollback testi (gerçek transaction gerektirdiği için @SpringBootTest — burada haklı).
+
+Created
+application-test.yml
++16
+-0
+Mevcut iki integration testine @ActiveProfiles("test") ekleyip onların loglarını da sessizleştireyim:
+
+
+Edited 2 files
+Şimdi saf domain invariant testleri (context yok):
+
+
+Created 2 files
+Payment alt sistemi testleri — strategy'ler, registry, service (Mockito):
+
+
+Created 3 files
+Mapper testleri (saf):
+
+
+Created 2 files
+Son olarak tekil rollback testi — ödeme patlayınca stok geri alınıyor mu / order kaydedilmiyor mu (gerçek transaction gerektiği için @SpringBootTest, ödeme @MockBean ile patlatılıyor):
+
+Created
+OrderServiceRollbackTest.java
++74
+-0
+Şimdi her şeyi derleyip tüm test setini çalıştıralım (bağımlılık kaldırma + yeni testler birlikte). Önce clean ile eski jar referanslarını temizleyelim:
+
+Ran
+Clean build and run full test suite
+Faz 5 tamamlandı. ✅ 22 test, hepsi geçti, BUILD SUCCESS.
+
+Önemli doğrulamalar:
+
+OrderServiceRollbackTest geçti → spring-boot-starter-aop kaldırıldıktan sonra bile proxy-tabanlı @Transactional rollback çalışıyor (ödeme patladı → stok 10'da kaldı, order kaydedilmedi). Bağımlılık kararı kanıtlandı.
+Saf birim testler context'siz ve hızlı (0.002–0.12s); yalnızca 3 @SpringBootTest context yüklüyor.
+Test logları sessiz (application-test.yml profili) — SQL/trace kirliliği yok.
+AI_NOTES'taki "dormant" notunu "kaldırıldı"ya güncelleyeyim:
+
+Edited
+AI_NOTES.md
++6
+-2
+Memory'deki locking kararını da güncelleyeyim (spring-retry artık kaldırıldı):
+
+
+Saved a memory
+Faz 5 tamamlandı ve doğrulandı. ✅
+
+Teslim edilenler
+Test sınıfı	Tür	Kapsam
+ProductTest	saf	decreaseStock invariant'ı (azaltma, sıfıra inme, yetersizse fırlat + stok bozulmaz, non-positive)
+OrderItemTest	saf	of() fiyat snapshot + subtotal hesabı
+PaymentStrategyTest	saf	3 strategy: method + referans prefix
+PaymentStrategyRegistryTest	saf+Mockito	doğru resolve, kayıtsız method→throw, duplicate→fail-fast
+PaymentServiceTest	Mockito	onay→COMPLETED Payment, red→PaymentFailedException
+OrderMapperTest	saf	toResponse (item+payment), payment'sız null, toCommand, toBulkResponse sayımı
+ProductMapperTest	saf	alan kopyalama
+OrderServiceRollbackTest	@SpringBootTest	ödeme patlayınca stok+order rollback
+Artı: application-test.yml (sessiz test logları) + mevcut 2 integration testine @ActiveProfiles("test").
+
+İki ek isteğin
+spring-retry / spring-aop → kaldırıldı. @EnableRetry silindi, pom sadeleşti. Rollback testi proxy-@Transactional'ın hâlâ çalıştığını kanıtladı. (AI_NOTES + karar notu güncellendi.)
+Test logları temiz — yeni testler log'a bağımlı değil, SQL/trace kirliliği yok.
+Test envanteri (toplam 22)
+Üç odak alanı (Faz 3) + domain invariant + payment alt sistemi + mapper + rollback → kritik senaryolar kapsanmış. Hızlı: çoğu birim test <0.1s.
+
+Not: Bu makinede mvn test -DforkCount=0 kullanıyorum (Türkçe-yol fork bug'ı); değerlendiricide düz mvn test çalışır. README'ye düz komutu yazacağız.
+
+Faz 5'i gözden geçir; onayınla Faz 6 — README + AI transparency'e geçerim.
+
+Faz 5'i inceledim — 22 test, domain/payment/mapper/rollback kapsamı ve concurrency testinin kesin-sayı assert'leri sağlam, bağımlılık temizliği de doğru. Faz 6'ya geçmeden önce, otomatik test olarak hâlâ eksik olan birkaç kritik senaryo var; bunları ekleyelim.
+
+Kural: Hepsi src/test altında kalıcı, commit'lenen JUnit test sınıfı olacak; gerçek assertion'lı, mvn test ile koşan. Elle/curl/console doğrulaması KABUL DEĞİL.
+
+Çok-kalemli atomiklik (integration, @SpringBootTest + gerçek H2): İki farklı ürünlü tek bir test sınıfı:
+Happy path: ikisi de stokta → sipariş başarılı, her iki ürünün stoğu da doğru düşmüş, totalAmount iki subtotal'ın toplamı, order CONFIRMED + payment COMPLETED.
+Rollback: ilk kalem stokta, ikinci kalem stoksuz → InsufficientStockException, tüm transaction geri sarmalı: ilk ürünün stoğu hiç düşmemeli, order/payment kaydı oluşmamalı. (Bu, mevcut OrderServiceRollbackTest'teki ödeme-rollback'inden farklı bir tetikleyici — stok kaynaklı rollback.)
+Deadlock-free sıralı kilit (integration, gerçek concurrency): İki ürün; bir grup thread [A,B], diğer grup [B,A] sırasıyla eşzamanlı sipariş etsin, defalarca. Test deadlock/timeout olmadan hepsinin tamamlandığını ve son stokların tutarlı olduğunu assert etsin. createOrder artan id'ye göre sıralı kilitliyor — bu testi onu doğrulayacak şekilde kur.
+API regresyon (@WebMvcTest + MockMvc): Faz 4 HTTP matrisini otomatikleştir — service mock'lanarak: 404 (ürün/order yok), 400 (bozuk JSON / geçersiz enum / tip uyuşmazlığı / alan-bazlı validation mesajı), 409 (yetersiz stok), 422 (ödeme hatası). Status kodu + ApiError gövdesi assert edilsin.
+(Opsiyonel) Registry tamlığı: @ParameterizedTest @EnumSource(PaymentMethod.class) ile her enum değerinin bir strategy'e çözüldüğünü garanti et — biri enum ekleyip strategy eklemezse test patlasın (Open/Closed güvencesi).
+Senior + YAGNI dengesini koru. Bunlar bitince mvn test yeşil olsun ve yeni test isimlerini çıktıda göreyim; sonra Faz 6 (README) onayını birlikte vereceğiz.
+
+Onaylandı. Bu 5 senaryoyu kalıcı JUnit testleri olarak ekliyorum — hepsi src/test altında, gerçek assertion'lı, mvn test ile koşan. Plan:
+
+MultiItemOrderTest (@SpringBootTest+H2) — iki ürün: happy path (her iki stok düşer, total = subtotal toplamı, CONFIRMED+COMPLETED) ve stok-kaynaklı rollback (ilk kalem stokta, ikinci stoksuz → tam geri sarma).
+OrderedLockingConcurrencyTest (gerçek concurrency) — [A,B] vs [B,A] grupları eşzamanlı, defalarca; deadlock/timeout yok + son stoklar tutarlı.
+OrderApiRegressionTest (@WebMvcTest+MockMvc) — service mock'lu HTTP matrisi: 404/400(×4)/409/422, status + ApiError gövdesi.
+PaymentRegistryCompletenessTest (@ParameterizedTest @EnumSource) — her enum bir strategy'e çözülüyor (Open/Closed güvencesi).
+Faz 5b extra tests
+
+Created 2 files
+Şimdi MockMvc API regresyon testi ve registry tamlık testi:
+
+
+Created 2 files
+Tüm test setini çalıştıralım — yeni sınıf isimleriyle birlikte görelim:
+
+Ran
+Run full test suite with new tests
+Faz 5b (ek testler) tamamlandı. ✅ 36 test, hepsi geçti, BUILD SUCCESS (22 → 36).
+
+Eklenen test sınıfları (çıktıdan)
+Sınıf	Test	Doğruladığı
+MultiItemOrderTest	2	İki ürünlü happy path (her iki stok düşer, total=Σsubtotal, CONFIRMED+COMPLETED) + stok-kaynaklı rollback (ilk ürün stoğu hiç düşmez, order/payment kaydı oluşmaz)
+OrderedLockingConcurrencyTest	1	[A,B] vs [B,A] 20 thread × 5 iter eşzamanlı → deadlock/timeout yok, son stoklar tam tutarlı (artan-id kilit sırası kanıtı)
+OrderApiRegressionTest (@WebMvcTest)	8	HTTP matrisi: 404×2, 400×4 (bozuk JSON / geçersiz enum / tip uyuşmazlığı / alan-bazlı mesaj), 409, 422 — status + ApiError gövdesi assert'li
+PaymentRegistryCompletenessTest	3	@EnumSource(PaymentMethod) → her enum bir strategy'e çözülüyor (Open/Closed güvencesi: strategy'siz enum eklenirse test patlar)
+Önemli noktalar
+MultiItemOrderTest rollback'i, OrderServiceRollbackTest'ten farklı bir tetikleyici kullanıyor: ödeme değil, stok yetersizliği — ve ilk kalemin (düşük id, önce kilitlenip in-memory düşürülen) stoğunun bile geri alındığını kanıtlıyor.
+OrderedLockingConcurrencyTest, createOrder'ın iç sorted(by productId) kilitlemesini doğrudan sınıyor — sıralama olmasaydı bu test deadlock'a girip timeout'tan fail ederdi.
+API regresyonu service mock'lu, context-hafif @WebMvcTest (WebConfig hariç tutuldu) — hızlı (4.5s) ve izole.
+Tüm @SpringBootTest sınıfları aynı (mock'suz) context'i paylaşıp cache'liyor; sadece OrderServiceRollbackTest (@MockBean) ayrı context. Test seti hâlâ hızlı.
+Yine mvn test -DforkCount=0 (Türkçe-yol fork bug'ı); değerlendiricide düz mvn test.
+
+Test envanteri artık üç odak alanı + çok-kalemli atomiklik + deadlock-freedom + HTTP matrisi + domain/payment/mapper'ı kapsıyor. İncele; onayınla Faz 6 — README + AI transparency'e geçerim.
+
+Testlere baktım, eline sağlık. multi-item rollback ve ters-sıra deadlock testi tam istediğim gibi olmuş, API regresyonu da hem status hem ApiError gövdesini kontrol ediyor, gayet temiz. Faz 6'ya geçelim, README + AI transparency.
+
+README'yi yazarken birkaç şeye dikkat et: endpoint'ler gerçek path'leriyle geçsin (/api/products, /api/orders), tek komutla ayağa kaldırma (mvn spring-boot:run) ve tek komutla test (mvn test) net yazılsın, bir-iki örnek request/response koy. AI_NOTES'taki kararları README'ye işle — pessimistic lock'u neden seçtik, neden atomic update değil, strategy pattern, transaction sınırı, retry bağımlılığını neden kaldırdık. Case zaten AI'yı nasıl kullandığımızı soruyor, o bölümü dürüst yaz: nerede AI'nın önerisini sorgulayıp değiştirdik (özellikle optimistic→pessimistic dönüşü iyi örnek). Şişirme, öz ve teknik dursun. Docker'ı (Faz 7) sonra ekleyeceğiz, README'de şimdilik Maven komutları yeterli.
+
+Onaylandı, teşekkürler. README'yi yazıyorum — gerçek path'ler, tek-komut çalıştırma/test, örnek request/response, ve AI_NOTES'tan damıtılmış karar + dürüst AI-transparency bölümü. Öz ve teknik tutuyorum; Docker'ı şimdilik dahil etmiyorum.
+
+Faz 6 README
+Created
+README.md
++254
+-0
+README hazır. Repo teslimatı için bir de standart .gitignore ekliyorum (şu an target/ versiyon kontrolüne girmeye aday görünüyor) — bu Faz 6'nın teslim-hazırlık parçası:
+
+Created
+.gitignore
++17
+-0
+Faz 6 tamamlandı. ✅ README.md yazıldı + repo teslimatı için .gitignore eklendi.
+
+README içeriği
+Çalıştırma/test: mvn spring-boot:run ve mvn test (tek komut, net)
+API tablosu: gerçek path'lerle (/api/products, /api/products/{id}, /api/orders, /api/orders/bulk, /api/orders/{id})
+Örnek request/response: tek sipariş (201) + paralel bulk (200, per-item) + ApiError + HTTP kod matrisi
+Rollback senaryosu nasıl test edilir: otomatik testler + elle curl örneği
+Eşzamanlılık senaryosu nasıl test edilir: OrderConcurrencyTest / OrderedLockingConcurrencyTest
+Tasarım kararları: pessimistic lock (+ neden optimistic/atomic değil), transaction sınırı, Strategy+Registry, paralel izolasyon, retry bağımlılığını kaldırma, rich domain model
+Test stratejisi: 36 testin kapsam tablosu
+AI Kullanımı ve Şeffaflık: dürüst bölüm — özellikle optimistic→pessimistic dönüşü AI önerisini sorgulayıp değiştirmenin örneği olarak öne çıkarıldı; junior over-engineering'i sadeleştirme, @Retryable tuzağı, anemic model düzeltmesi
+Öz ve teknik tuttum; AI_NOTES'taki kararları README'ye damıttım (ikisi tutarlı).
+
+Senin yapman gereken tek manuel adım
+Case AI sohbet geçmişini teslimata eklemeni istiyor. README'de "tam sohbet geçmişi teslimata eklenmiştir" dedim — bunu gerçekten eklemen gerek: bu oturum + önceki Antigravity oturumu export'u (markdown/link/screenshot). İstersen masaüstündeki case_analysis.md'yi de AI-süreç artefaktı olarak repoya koyabilirsin (opsiyonel, ama AI sürecini güzel gösterir).
+
+Güncel durum
+✅ Faz 0–6 (kod + 36 test + README) — proje teslim edilebilir durumda
+Faz 7 — Docker (multi-stage Dockerfile + docker-compose, docker compose up)
+Faz 8 — Frontend test-harness (en son)
+README'yi gözden geçir; onayınla Faz 7 — Docker'a geçerim. (Not: Docker'da mvn fork sorunu olmayacağı için container içinde standart mvn komutları sorunsuz çalışacak — yereldeki Türkçe-yol bug'ı orada yok.)
+
+README'yi okudum, çok temiz olmuş. Path'ler, örnekler seed veriyle tutuyor, kararlar net. Faz 7'ye geçelim, Docker.
+
+Multi-stage bir Dockerfile yaz: build aşamasında Maven ile paketle, runtime'da slim bir JRE imajı kullan, 8080'i expose et. H2 in-memory olduğu için ayrı DB servisine gerek yok ama "tek komutla ayağa kalksın" diye basit bir docker-compose.yml da ekle, docker compose up deyince çalışsın. README'ye de kısa bir Docker bölümü ekle (hem docker compose up hem mvn alternatifi dursun). Sade tut, gereksiz servis ekleme.
+
+Onaylandı. Faz 7 — Docker. Multi-stage Dockerfile (Maven build → slim JRE runtime), docker-compose.yml, .dockerignore ve README'ye kısa Docker bölümü ekliyorum. Ayrı DB servisi yok (H2 in-memory).
+
+Faz 7 Docker
+
+Created 3 files
+Şimdi README'ye Docker bölümünü ekleyeyim (Test bölümünden sonra):
+
+Edited
+README.md
++20
+-0
+Şimdi Dockerfile'ın gerçekten çalıştığını doğrulayalım. Önce Docker'ın mevcut olup olmadığına bakayım:
+
+Ran
+Check Docker availability
+Docker mevcut (28.5.1). Dockerfile'ın çalıştığını doğrulamak için imajı build edip container'ı ayağa kaldıralım. Build (base imaj çekme + Maven build) birkaç dakika sürebilir — arka planda çalıştırıyorum:
+
+Ran
+Build Docker image
+Docker imajı build oluyor (arka planda) — base imajların çekilmesi + container içinde Maven build birkaç dakika sürebilir. Tamamlanınca container'ı ayağa kaldırıp curl ile doğrulayıp sonucu raporlayacağım. Bittiğinde bilgilendirileceğim, bekliyorum.
+
+Ran
+Check interim build output
+Build sürüyor, henüz çıktı yok. Tamamlandığında otomatik bilgilendirileceğim; o zaman container'ı ayağa kaldırıp doğrulayacağım ve Faz 7 sonucunu raporlayacağım.
+
+Manuel Sipariş kartını dinamik çok-kalemli yapıya çeviriyorum. Önce HTML:
+
+Edited
+index.html
++14
+-10
+Şimdi app.js — ürün dropdown'ı, dinamik satır yönetimi ve çok-kalemli "Sipariş Ver":
+
+Edited
+app.js
++39
+-1
+Şimdi place-order handler'ını çok-kalemli hale getirip add-line butonunu ve init'i bağlayayım:
+
+Edited
+app.js
++16
+-5
+Şimdi styles.css'e satır düzeni için stiller:
+
+Edited
+styles.css
++15
+-0
+Frontend güncellendi. Şimdi docker compose up --build ile ayağa kaldırıp çok-kalemli siparişi doğrulayalım (ve container'ı açık bırakacağım):
+
+Ran
+Rebuild and start container (leave running)
+Build arka planda çalışıyor; tamamlanınca container'ı bekleyip çok-kalemli siparişi doğrulayacağım.
+
+Background shell completed
+Rebuild and start container (leave running)
+Ran
+Verify multi-item order against running container
+Tamamlandı — çok-kalemli Manuel Sipariş kartı çalışıyor, container açık bırakıldı. ✅
+
+Değişiklikler
+index.html: Manuel Sipariş kartı artık dinamik satırlı — her satır ürün dropdown'ı + adet + × sil butonu; altında + Ürün ekle; ödeme tek dropdown (tüm sipariş için).
+app.js: Dropdown'lar GET /api/products'tan "id · ad (fiyat)" olarak dolar; addOrderLine/satır-silme (en az 1 satır kalır); Sipariş Ver tüm satırları items: [{productId, quantity}, ...] olarak toplayıp POST /api/orders'a gönderir, boş/geçersiz satırları atlar (adet ≥ 1); stoğu sıfırlamaz (yalnızca tabloyu yeniler → kümülatif düşüş görünür).
+styles.css: Satır/footer düzeni, mevcut kart/buton stiliyle uyumlu.
+Doğrulama (çalışan Docker container'ına karşı)
+Güncel app.js servis ediliyor (yeni çok-kalemli markörler mevcut).
+Çok-kalemli sipariş: ürün1 ×2 + ürün2 ×3 (CRYPTO) → HTTP 201, status=CONFIRMED, paymentStatus=COMPLETED, total=3089.68 (2999.98 + 89.70), iki kalem de yanıtta.
+Kümülatif stok (reset yok): ürün1 25→23 (−2), ürün2 200→197 (−3). Form stoğu sıfırlamadı — istediğin davranış.
+Container açık
+order-service Up, http://localhost:8080 erişilebilir — panelden testlere devam edebilirsin. docker compose down çalıştırmadım; durdurmak istediğinde kendin çalıştırabilirsin (docker compose down).
+
+Docker'da çalıştırınca H2 konsoluna girince "remote connections disabled" hatası alıyorum, container içinde çalıştığı için dışarıdan bağlanınca uzak sayıyor sanırım. docker-compose'a bunu açan environment değişkenini ekleyip Docker'da da konsola girebilelim. Yereldeki güvenli ayar aynen kalsın, sadece container'da açılsın. Ekledikten sonra ayağa kaldırıp gerçekten girilebildiğini doğrula, bir cümleyle de neden gerektiğini not düş.
+
+H2 konsolu container'da uzak bağlantı olarak görülüyor; doğru çözüm web-allow-others'ı sadece container'da açmak. Spring'in relaxed-binding'i sayesinde application.yml'deki güvenli false yerelde aynen kalır, env değişkeni yalnızca container'da override eder. docker-compose'a ekliyorum:
+
+Edited
+docker-compose.yml
++4
+-0
+Container'ı yeni env ile yeniden oluşturayım (imaj değişmedi, rebuild gerekmez):
+
+Ran
+Recreate container with H2 env var and confirm it's set
+Env true. Şimdi gerçekten girilebildiğini kanıtlamak için H2 konsolunun login akışını curl ile yürütelim. Önce konsol oturumunun jsessionid'sini alalım:
+
+Ran
+Fetch H2 console login page and extract jsessionid
+jsessionid alındı. Şimdi konsol login'i POST'layıp gerçekten bağlanıyor mu görelim (web-allow-others false olsaydı burada "Remote connections" hatası dönerdi):
+
+Ran
+Attempt H2 console login and check success/failure markers
+Login başarılı — hata markörü yok, başarı sonrası tablo çerçevesi (tables) geldi. Kesinleştirmek için konsoldan gerçek bir sorgu çalıştırıp veriyi görelim:
+
+Ran
+Run a real query through H2 console and clean temp files
+Doğrulandı — H2 konsoluna container'da gerçekten girilebiliyor: login başarılı ve konsoldan çalıştırdığım SELECT COUNT(*) FROM PRODUCTS sorgusu 8 döndü (seed verisi). Geçici dosyalar temizlendi, container açık kalmaya devam ediyor.
+
+Değişiklik
+docker-compose.yml'ye eklendi:
+
+    environment:
+      - SPRING_H2_CONSOLE_SETTINGS_WEB_ALLOW_OTHERS=true
+Neden gerekti (tek cümle): Container içinde çalışan H2, host tarayıcısından gelen bağlantıyı "remote" sayar ve web-allow-others varsayılan false olduğu için reddeder; bu env değişkeni ayarı yalnızca container'da true'ya çeker, application.yml'deki güvenli false yerelde aynen korunur (Spring relaxed-binding ile env override).
+
+Konsol erişimi: http://localhost:8080/h2-console → JDBC URL jdbc:h2:mem:orderdb, kullanıcı sa, şifre boş.
+
+Tamamdır şimdi de eğer gerekliyse README/AI_NOTES a not düşebilirsin.
+
+Evet, kısa birer not faydalı — değerlendirici Docker'la çalıştırıp konsola bakabilir. README'nin Docker bölümüne ve AI_NOTES'un Docker notuna ekliyorum:
+
+
+Edited 2 files
+Notlar eklendi:
+
+README.md (Docker bölümü): H2 konsolunun Docker'da da çalıştığı + neden env değişkeninin sadece container'da verildiği, yereldeki güvenli false'un korunduğu.
+AI_NOTES.md (Docker notu): aynı kararın gerekçesi — yerel config'i zayıflatmak yerine relaxed-binding override ile yalnızca container'da açma.
+Kod/config değişmedi (sadece dokümantasyon), container açık kalmaya devam ediyor — panelden testlerine devam edebilirsin.
+
+Proje şu anda tamam mıdır? Teslimden önce case'i seninle bir daha baştan kontrol etmek istiyorum. Elimizdeki gereksinimleri tek tek projeyle karşılaştırır mısın? Case de istenilen başka bir şey var mıdır? Fonksiyonel gereksinimler, üç odak alanı (paralel işlem, transaction, design pattern), testler ve dokümantasyon tam mı? Eksik kalan ya da "şunu da eklesek daha sağlam olur" dediğin bir şey var mı? over-engineering yapmadan, aşırıya kaçmadan seninle birlikte bu durum teyit etmek istiyorum.
+
+Bunu netleştirdikten sonra asıl amacım projeyi tam sahiplenmek, kavrayabilmek; mülakatta her kararı "neden bunu kullandın, bu kararı nasıl verdin" gibi sorular gelebilir ve hepsini rahatça açıklayabilmek, savunmak istiyorum. Aklımdaki sıra şöyle: önce mimariyi ve bir sipariş isteğinin uçtan uca akışını (katmanlar ne işe yarıyor) oturtmak, sonra üç odak alanını derinlemesine konuşmak, ardından "yeni bir ödeme yöntemi eklesek nasıl olurdu" gibi pratik bir örnek, sonra SOLID ve design pattern açısından gözden geçirip yerinde mi/gereksiz bir şey var mı bakmak, en son da testleri tek tek neyi kanıtlıyor diye gezmek.
+
+Sence projeyi derinlemesine tanımak ve mülakata hazırlanmak için iyi bir yol mu bu, yoksa daha iyi bir sıra/yaklaşım önerir misin? Projede ek bir şey yoksa bu plana göre ilerleyelim.
+
+Süper — teslimden önce baştan denetleyelim. Önce iddialarımı doğru kurmak için birkaç noktayı koddan teyit edeyim (kullanılmayan enum değerleri vb.), sonra gereksinim-gereksinim karşılaştırıp planını değerlendireyim.
+
+
+Searched code
+Koddan teyit ettim: birkaç metot ve enum değeri tanımlı ama hiç çağrılmıyor (Order.markFailed(), isPaid(), removeItem(); OrderStatus.FAILED/CANCELLED; PaymentStatus.PENDING/FAILED/REFUNDED). Bunu aşağıda "tek gerçek temizlik" olarak ele alıyorum. Önce tam denetim:
+
+1. Gereksinim → Proje karşılaştırması
+Case gereksinimi	Durum	Nerede
+Java 17+, Spring Boot 3.x, Maven, H2 in-memory, REST/JSON	✅	pom.xml, application.yml
+Tek komutla çalıştırma	✅	mvn spring-boot:run / docker compose up --build
+Senaryo: stok kontrol → sipariş+stok düş → ödeme → bildirim	✅	OrderService.createOrder + NotificationService (log)
+Ürün/sipariş/ödeme kavramları	✅	Product, Order, OrderItem, Payment
+Fonk: ürünleri listele (stok+fiyat)	✅	GET /api/products
+Fonk: tek sipariş oluştur	✅	POST /api/orders
+Fonk: birden fazla siparişi paralel işle	✅	POST /api/orders/bulk
+Fonk: sipariş detayı	✅	GET /api/orders/{id}
+Fonk: açılışta örnek ürünler	✅	DataInitializer (8 ürün)
+Odak 1: paralel + per-order sonuç + bir hata diğerini etkilemez	✅	BulkOrderService + BulkOrderResult
+Odak 1: race condition, oversell/eksiye düşme yok	✅	Pessimistic lock + OrderConcurrencyTest
+Odak 2: sipariş+stok+ödeme atomik, herhangi biri patlarsa hiçbir şey kalıcı değil	✅	tek @Transactional + rollback testleri
+Odak 2: README'de nasıl test edilir	✅	README "Transaction/rollback" bölümü
+Odak 3: ≥1 pattern, yerinde; ≥2-3 ödeme yöntemi; yeni yöntem mevcut kodu değiştirmez; README gerekçe	✅	Strategy+Registry, 3 yöntem, OCP, README
+Test: otomatik, anlamlı, rollback + eşzamanlı stok kapsanmış, mvn test yeşil	✅	39 test
+AI şeffaflık: hangi öneri sorgulandı/değiştirildi	✅	AI_NOTES.md (optimistic→pessimistic)
+AI şeffaflık: sohbet geçmişini teslimata ekle	⚠️ Eksik	Manuel: export'ları repoya koymalısın
+Teslimat: README (çalıştırma, test, örnek istek, rollback testi, karar notları, AI)	✅	README.md
+2. Sonuç ve bulgular (over-engineering yok)
+Proje fonksiyonel olarak tam ve teslim edilebilir. Üç odak alanı da kapsanmış ve testlerle kanıtlı. Sadece şunlar var:
+
+a) Gerçekten eksik (zorunlu): AI sohbet geçmişi fiziksel olarak eklenmemiş — README "tam sohbet geçmişi teslimata eklenmiştir" diyor, bu cümleyi gerçeğe çevirmek lazım (bu + önceki Antigravity oturumu export'u, ör. docs/ai-chat/). Bir de tüm Faz 2–8 değişikliklerini commit'lemek gerekiyor (repo'da henüz commit edilmemiş).
+
+b) Tek gerçek temizlik (öneri): Ölü kod — hiç çağrılmayan markFailed(), isPaid(), removeItem() ve kullanılmayan enum değerleri (OrderStatus.FAILED/CANCELLED, PaymentStatus.PENDING/FAILED/REFUNDED). Mülakatçı "bunu neden koydun, kullanılmıyor" diye sorabilir. İki seçenek:
+
+Yalın (önerim): 3 ölü metodu sil; enum'ları akışın gerçekten ürettiği değerlere indir (OrderStatus{PENDING,CONFIRMED}, PaymentStatus{COMPLETED}).
+Sözlük olarak tut: enum'ları yaşam-döngüsü vokabüleri diye bırak, "başarısızlıklar persist edilmeyip rollback olduğu için FAILED/REFUNDED henüz bir endpoint'le sürülmüyor" diye açıkla.
+c) Bilinçli olarak EKLEMEYİ önermediklerim (hepsi bu kapsamda YAGNI): aynı siparişte tekrarlı ürün satırı birleştirme, Actuator/health endpoint, Spring Security, async event-driven notification, ürün listesinde pagination. Hiçbiri case'in istediği bir şey değil; eklemek "gösteriş için" olur.
+
+3. Çalışma planın hakkında
+Sıran çok iyi — somuttan soyuta, en doğal öğrenme akışı: mimari/akış → üç odak → uygulamalı örnek → SOLID/pattern gözden geçirme → testler. Pedagojik olarak doğru ve mülakatta da bu sırayla anlatabilirsin. Üç küçük ekleme öneririm:
+
+Başa 60 saniyelik "asansör konuşması": servis ne yapıyor + 3 manşet karar (pessimistic lock, tek transaction, Strategy+Registry). Mülakata güçlü giriş.
+2. adıma (üç odak) trade-off Q&A'larını göm: en olası "neden" soruları orada — pessimistic neden, optimistic/atomic neden değil; 200 vs 207; retry'ı neden kaldırdık; @Retryable+@Transactional proxy tuzağı.
+En sona bir "limitler & ölçeklenince ne yapardık" adımı: multi-instance → distributed lock / atomik UPDATE; gerçek ödeme gateway → Saga/outbox; FAILED siparişi persist etme. "Production'a çıksa ne olur" sorusunu karşılar, olgunluk gösterir.
+Önce hızlı bir karar: (b)'deki ölü kodu temizleyeyim mi (yalın seçeneği uygulayıp mvn test ile doğrularım), yoksa sözlük olarak bırakıp mülakatta açıklamayı mı tercih edersin? Bunu netleştirince 1. adımdan (mimari + bir sipariş isteğinin uçtan uca akışı) başlayalım.
+
+Yalın temizliği uyguluyorum. Önce Order.java'nın güncel halini görüp metotları çıkarayım:
+
+
+Read a file, edited a file
+Şimdi enum'ları kullanılan değerlere indir:
+
+
+Edited 2 files
+Şimdi tüm test setini çalıştırıp hâlâ yeşil olduğunu doğrulayalım:
+
+Ran
+Run full test suite after dead-code removal
+39 test hâlâ yeşil, BUILD SUCCESS — temizlik güvenli. AI_NOTES'a notu düşeyim:
+
+
+Read a file, edited a file
+Temizlik tamam: Order.markFailed/isPaid/removeItem silindi, enum'lar kullanılan değerlere indi (OrderStatus{PENDING,CONFIRMED}, PaymentStatus{COMPLETED}), BulkOrderResult.Status'a dokunulmadı. 39 test hâlâ yeşil, AI_NOTES'a not düşüldü (AI_NOTES.md §11).
+
+Proje artık yalın ve teslime hazır (geriye senin manuel adımların: AI sohbet geçmişini ekle + commit'le). Söz verdiğimiz gibi 1. adıma geçiyorum.
+
+Adım 1 — Mimari ve bir sipariş isteğinin uçtan uca akışı
+Katmanlar ve görevleri
+Katman (paket)	Sorumluluk	"Neden ayrı?"
+api/controller	HTTP sınırı. Girdiyi doğrula, DTO→command çevir, servisi çağır, sonucu DTO'ya çevir. İş kuralı yok.	Controller değişikliği (HTTP biçimi) iş mantığını etkilemesin
+api/dto (request/response)	Tel sözleşmesi (JSON). Validation anotasyonları burada.	Entity'ler dışarı sızmasın → DB şeması API'ye bağlı kalmasın
+api/mapper	Entity/command ↔ DTO çevirisi (elle)	Çeviri tek yerde, test edilebilir
+api/exception	GlobalExceptionHandler + ApiError	Tutarlı, tek-tip hata sözleşmesi
+service	Use-case orkestrasyonu + transaction sınırı. CreateOrderCommand servis girdisi	İş akışının sahibi; web ve DB'den bağımsız
+domain/model	JPA entity'leri + invariant'lar (Product.decreaseStock, OrderItem.of, Order.recalculateTotal/markConfirmed)	Kurallar entity'de yaşar (anemic değil) → bypass edilemez
+payment	Strategy alt sistemi (interface + registry + 3 strateji)	Ödeme bağımsız bir modül; OCP ile genişler
+repository	Spring Data JPA. ProductRepository.findByIdForUpdate (pessimistic lock), OrderRepository (entity graph)	Veri erişimi soyutlanır
+config	AsyncConfig (executor), WebConfig/CorsProperties, PaymentProperties, DataInitializer	Kros-kesit yapılandırma tek yerde
+exception (kök)	İş istisnaları (InsufficientStock, PaymentFailed, *NotFound)	Domain, api'ye bağımlı olmadan kullanabilsin
+Bağımlılık yönü (tek yön): Controller → Service → Repository; Service → payment (registry üzerinden); domain hiçbir şeye bağımlı değil. Entity'ler hiçbir zaman controller'a çıkmaz (hep DTO).
+
+Uçtan uca: POST /api/orders bir istek
+HTTP POST /api/orders {customerId, paymentMethod, items[]}
+   │
+1. OrderController.createOrder(@Valid CreateOrderRequest)
+   │   └─ Bean Validation: customerId/paymentMethod NotNull, items NotEmpty,
+   │      quantity 1..100000 → ihlal: MethodArgumentNotValidException → 400
+2. OrderMapper.toCommand(req) → CreateOrderCommand   (web DTO'sundan kopar)
+   │
+3. OrderService.createOrder(cmd)   ┌── @Transactional başlar ──────────────┐
+   │   a. Order(PENDING, total=0) kur                                       │
+   │   b. kalemleri productId'ye göre ARTAN sırala  (deadlock önleme)       │
+   │   c. her kalem için:                                                   │
+   │        productService.getForUpdate(id)                                 │
+   │          → ProductRepository.findByIdForUpdate  (SELECT … FOR UPDATE)  │
+   │            = pessimistic write lock → aynı ürün çekişmesini serialize  │
+   │        product.decreaseStock(qty)  → yetersizse InsufficientStock 💥   │
+   │        OrderItem.of(product, qty)  → fiyat snapshot + subtotal         │
+   │        order.addItem(item)                                             │
+   │   d. order.recalculateTotal()                                          │
+   │   e. paymentService.charge(method, total)                             │
+   │        → registry.resolve(method) → strategy.pay()                     │
+   │          başarısız (ör. CC limit) → PaymentFailed 💥                   │
+   │          başarılı → COMPLETED Payment; order.attachPayment(p)          │
+   │   f. order.markConfirmed()                                             │
+   │   g. orderRepository.save(order)  (items + payment cascade)            │
+   │   h. notificationService.notifyOrderConfirmed(order)  (log)            │
+   │                              └── herhangi bir 💥 → TÜM transaction rollback ┘
+4. OrderMapper.toResponse(order) → OrderResponse → HTTP 201
+Kritik nokta (mülakatta vurgula): a–h'nin tamamı tek transaction. c'de stok düşüşü veya e'de ödeme patlarsa, o ana kadar bellekte yapılmış stok düşüşleri commit edilmez → ne yarım sipariş, ne değişmiş stok. Hata GlobalExceptionHandler'da doğru HTTP koduna çevrilir (409/422).
+
+Neden bu katmanlama? Her katmanın tek bir değişme sebebi var (SRP): HTTP sözleşmesi değişirse api, iş akışı değişirse service, kural değişirse domain, ödeme yöntemi eklenirse sadece payment. Bu izolasyon olmasaydı "her şey OrderService'te" olur, test edilemez ve kırılgan olurdu.
+
+İstersen bunu pekiştirmek için sana birkaç "mülakatçı sorusu" sorabilirim (ör. "neden command nesnesi, doğrudan DTO'yu service'e geçsen olmaz mıydı?", "entity neden controller'a çıkmıyor?"), ya da hazırsan Adım 2 — üç odak alanını derinlemesine (trade-off Q&A'larıyla) konuşmaya geçeriz. Nasıl ilerleyelim?
+
+Plan için önerdiğin 3 eklemeyi de çok beğendim. Baştaki 60 saniyelik asansör konuşması, üç odak alanında trade-off Q&A'ları, en sonda "ölçeklenince ne yapardık" kısmı. Bunları da doğal yerlerine serpiştirelim.
+
+Şimdi 1. adımdan başlayalım: mimari ve bir sipariş isteğinin uçtan uca akışı. Önce katmanları (controller, service, domain, repository, config) ve hangi dosyanın ne işe yaradığını anlat; sonra tek bir POST /api/orders isteğinin Controller'dan DB'ye kadar adım adım nasıl aktığını göster. Stok kilitleme, ödeme adımı ve transaction sınırı dahil. İskeleti net oturtmak istiyorum, üstüne odak alanlarını konuşacağız.
+
+Harika, üçünü de doğal yerlerine serpiştiriyorum — asansör konuşmasıyla başlıyoruz.
+
+🎤 60 saniyelik asansör konuşması (mülakat açılışı)
+"Bu, küçük bir e-ticaret sisteminin sipariş işleme servisi — Java 17 / Spring Boot 3, in-memory H2 ile tek komutla çalışıyor. Müşteri sipariş verince servis stoğu kontrol eder, siparişi oluşturup stoğu düşer, seçilen yönteme göre ödemeyi alır ve müşteriyi bilgilendirir — hepsi atomik olarak. Üç mühendislik odağı var: (1) Eşzamanlılık — aynı ürüne paralel siparişler asla fazla satış yapamaz; bunu pessimistic row lock ve tutarlı kilit sırasıyla çözdüm. (2) Transaction — sipariş + stok + ödeme tek transaction; herhangi biri patlarsa her şey geri sarılır. (3) Design pattern — ödeme yöntemleri Strategy + Registry ile; yeni yöntem eklemek sadece yeni bir component (Open/Closed). Katmanlı bir yapı (controller → service → domain/repository), kritik eşzamanlılık ve rollback yollarını kanıtlayan 39 test, Maven veya Docker ile çalışma ve API'yi denemek için statik bir test paneli içeriyor."
+
+Bunu ezberleme — mantığını kavra; mülakatçı "anlat bakalım" derse 4 cümlede manşetleri ver, detayı soru geldikçe aç.
+
+Adım 1 — Mimari iskelet (dosya dosya)
+Katmanlar ve içlerindeki dosyalar
+api/ — HTTP sınırı (dış dünya)
+
+controller/OrderController → POST /api/orders, POST /api/orders/bulk, GET /api/orders/{id}. İnce: doğrula → command'a çevir → servisi çağır → response'a çevir.
+controller/ProductController → GET /api/products, GET /api/products/{id}, PATCH /api/products/{id}/stock.
+dto/request/* → CreateOrderRequest, OrderItemRequest, BulkOrderRequest, UpdateStockRequest. Tel sözleşmesi + Bean Validation anotasyonları (@NotNull, @NotEmpty, @Min/@Max).
+dto/response/* → OrderResponse, OrderItemResponse, ProductResponse, BulkOrderResponse, BulkOrderItemResponse. Dışarı sadece bunlar çıkar, entity asla.
+mapper/OrderMapper, mapper/ProductMapper → entity/command ↔ DTO çevirisi (elle, şeffaf).
+exception/GlobalExceptionHandler + ApiError → tüm hataları tek-tip gövdeye ve doğru HTTP koduna çevirir.
+service/ — use-case orkestrasyonu + transaction sınırı
+
+OrderService → createOrder (tek sipariş, @Transactional) ve getOrderDetail. İskeletin kalbi.
+BulkOrderService → paralel toplu işleme; OrderService'i proxy üzerinden çağırır (ayrı bean olmasının sebebi bu).
+ProductService → ürün listeleme, getForUpdate (kilitli okuma), setStock.
+PaymentService → registry'den stratejiyi seçer, Payment entity'sini üretir.
+NotificationService → bildirim (log).
+CreateOrderCommand, BulkOrderResult → servis-seviyesi girdi/çıktı (web DTO'sundan bağımsız).
+domain/ — iş kurallarının sahibi (anemic değil)
+
+model/Product → decreaseStock(qty) "stok negatif olamaz" invariant'ı, changeStockTo(n). @Version (ikincil savunma).
+model/Order → addItem, attachPayment, recalculateTotal, markConfirmed. İlişki ve toplam mantığı burada.
+model/OrderItem → of(product, qty) fabrikası: fiyat snapshot + subtotal hesabı.
+model/Payment → ödeme kaydı.
+enums/ → OrderStatus{PENDING,CONFIRMED}, PaymentMethod{CREDIT_CARD,BANK_TRANSFER,CRYPTO}, PaymentStatus{COMPLETED}.
+payment/ — Strategy alt sistemi (bağımsız modül)
+
+PaymentStrategy (interface), PaymentResult (sonuç value object).
+PaymentStrategyRegistry → tüm stratejileri Spring'den toplayıp EnumMap'e koyar, resolve(method) ile seçer.
+strategy/CreditCardPaymentStrategy (limit kontrollü), BankTransferPaymentStrategy, CryptoPaymentStrategy.
+repository/ — veri erişimi (Spring Data JPA)
+
+ProductRepository → findByIdForUpdate (@Lock(PESSIMISTIC_WRITE) = SELECT … FOR UPDATE). Eşzamanlılık burada başlar.
+OrderRepository → findWithDetailsById (@EntityGraph ile items+payment tek sorguda; lazy hatası önler).
+PaymentRepository → standart CRUD.
+config/ — kros-kesit yapılandırma
+
+AsyncConfig → bounded ThreadPoolTaskExecutor (paralel işleme için, commonPool değil).
+WebConfig + CorsProperties → configurable CORS.
+PaymentProperties → app.payment.credit-card-limit.
+DataInitializer → açılışta 8 örnek ürün.
+Kök: OrderServiceApplication (@SpringBootApplication, @ConfigurationPropertiesScan) + exception/ (iş istisnaları: InsufficientStock, PaymentFailed, *NotFound — domain'in api'ye bağımlı olmaması için kökte).
+
+Bağımlılık yönü: Controller → Service → Repository, Service → payment (registry). domain hiçbir şeye bağlı değil. Entity hiçbir zaman dışarı çıkmaz.
+
+Bir POST /api/orders isteği: Controller'dan DB'ye
+Diyelim istek: { customerId: 42, paymentMethod: "CREDIT_CARD", items: [ {productId:1, qty:2}, {productId:2, qty:1} ] }
+
+① OrderController.createOrder(@Valid CreateOrderRequest)
+     • Bean Validation ÖNCE koşar (customerId/paymentMethod NotNull, items NotEmpty,
+       qty 1..100000). İhlal → MethodArgumentNotValidException → handler → 400 (DB'ye hiç gidilmez)
+     • @ResponseStatus(CREATED) → başarıda 201
+② OrderMapper.toCommand(req) → CreateOrderCommand
+     • Web DTO'sunu servis dilinden ayırır (servis HTTP'yi bilmez)
+③ OrderService.createOrder(cmd)   ╔═══ @Transactional: proxy girişte transaction AÇAR ═══╗
+     a) Order kur: status=PENDING, totalAmount=0                                          ║
+     b) kalemleri productId'ye göre ARTAN sırala → [ürün1, ürün2]                         ║
+        (deadlock önleme: herkes aynı sırada kilitlerse döngü oluşmaz)                    ║
+     c) HER kalem için:                                                                   ║
+        ┌ productService.getForUpdate(id)                                                 ║
+        │   └ ProductRepository.findByIdForUpdate(id)                                     ║
+        │       → SQL: SELECT … FROM products WHERE id=? FOR UPDATE                       ║
+        │       → satıra PESSIMISTIC WRITE LOCK; aynı ürüne paralel başka                 ║
+        │         transaction varsa burada BEKLER (serialize olur)                        ║
+        ├ product.decreaseStock(qty)   ← invariant entity'de                              ║
+        │   → stok < qty ise InsufficientStockException 💥 (rollback'e gider)             ║
+        │   → değilse stoğu bellekte düşer (managed entity; commit'te UPDATE flush olur)  ║
+        └ order.addItem( OrderItem.of(product, qty) )                                     ║
+            → OrderItem.of: unitPrice = o anki fiyat (snapshot), subtotal = fiyat×qty     ║
+     d) order.recalculateTotal()  → Σ subtotal = 2×1499.99 + 1×29.90 = 3029.88            ║
+     e) paymentService.charge(CREDIT_CARD, 3029.88)                                       ║
+        └ registry.resolve(CREDIT_CARD) → CreditCardPaymentStrategy                       ║
+            → limit kontrolü: 3029.88 ≤ 10000 → onay                                      ║
+            → PaymentResult.success(ref)                                                  ║
+          başarısız olsa → PaymentFailedException 💥 (rollback)                           ║
+          başarılı → Payment(COMPLETED, ref); order.attachPayment(payment)                ║
+     f) order.markConfirmed()  → status=CONFIRMED                                         ║
+     g) orderRepository.save(order)                                                       ║
+        → cascade ile OrderItem'lar + Payment de yazılır                                  ║
+     h) notificationService.notifyOrderConfirmed(order)  → log                            ║
+                          ╚═══ metot normal dönerse: COMMIT (stok UPDATE'i + insert'ler) ═╝
+                              herhangi bir 💥 unchecked exception → ROLLBACK (hiçbiri kalıcı olmaz)
+④ OrderMapper.toResponse(order) → OrderResponse → HTTP 201
+   (hata olduysa GlobalExceptionHandler: InsufficientStock→409, PaymentFailed→422)
+Üç can alıcı noktayı netleştirelim
+Stok kilitleme (c): Kilit, findByIdForUpdate'in SELECT … FOR UPDATE'iyle alınır ve transaction commit/rollback olana kadar tutulur. Yani aynı ürüne 100 paralel istek gelse, hepsi bu satırda sıraya girer; biri işini bitirip commit edene kadar diğeri bekler. Stok bitince bekleyenler decreaseStock'ta InsufficientStockException alır — temiz "yetersiz stok", lock hatası değil.
+
+Ödeme adımı (e): Ödeme, transaction'ın içinde. Burada gerçek bir dış gateway yok (case öyle istemiyor), mock bir strateji. Gerçek gateway olsaydı bunu transaction'ın içinde tutmazdık (uzun süren dış çağrı transaction'ı kilitli tutar) — orada Saga/outbox düşünürdük; bunu "ölçeklenince" kısmında konuşacağız.
+
+Transaction sınırı: Sınır tam olarak OrderService.createOrder proxy'sinde. Transaction girişte açılır, normal dönüşte commit edilir. Tüm iş istisnalarımız RuntimeException türevi olduğu için Spring default rollback yapar — rollbackFor yazmayı unutma riski yok. c'de bellekte düşülen stok bile commit edilmediği için DB'de hiç değişmez.
+
+Bir incelik: createOrder controller'dan (ayrı bean) çağrıldığı için Spring proxy devrede ve @Transactional çalışır. Aynı sınıf içinden çağrılsaydı (self-invocation) proxy atlanır ve transaction hiç başlamazdı — BulkOrderService'i ayrı bean yapmamızın sebebi de bu (Adım 2'de açacağız).
+
+İskelet bu. İstersen burada birkaç soruyla pekiştirelim (ör. "neden ayrı CreateOrderCommand?", "entity neden response'a çıkmıyor?", "@EntityGraph neden var?"), yoksa Adım 2 — üç odak alanı (trade-off Q&A'larıyla: pessimistic vs optimistic vs atomic, paralel izolasyon, proxy tuzağı) ile devam edelim. Nasıl istersin?
+
+Mimari ve akış çok net oturdu. Şimdi Adım 2. Üç odak alanını derinlemesine konuşalım. Sırayla: paralel işlem (BulkOrderService neden ayrı bean, bulk neden @Transactional değil, CompletableFuture + bounded thread pool, hata izolasyonu nasıl sağlanıyor), sonra transaction yönetimi (tek @Transactional sınırı, unchecked exception ile default rollback, self-invocation/proxy tuzağı), sonra design pattern (Strategy + Registry, neden bu pattern, Open/Closed). Her başlıkta "neden böyle, alternatifi neydi" trade-off'larını da göm. özellikle pessimistic vs optimistic vs atomic update karşılaştırması, ve bulk'ta neden 200 + per-item sonuç döndüğümüz. Mülakatta en çok bu üç başlıktan soru geleceği için sağlam ve örnekli anlat. Kendi katmak istediğin şeyler varsa onları da katarak adım 2 ye Üç odak alanına geçelim.
+
+İskelet net — şimdi en çok soru gelecek yere giriyoruz. Her başlıkta "nasıl çalışıyor → neden böyle, alternatifi neydi → kanıt/örnek" sırasını izleyeceğim.
+
+Adım 2 — Üç Odak Alanı
+A) Paralel İşlem
+Önce problemi görelim: neden kilit gerekiyor?
+Stok=10 bir ürüne iki thread aynı anda 3'er adet sipariş etsin. Kilit yoksa:
+
+T1 okur stok=10   T2 okur stok=10
+T1 yazar 10-3=7   T2 yazar 10-3=7     → final 7, oysa 4 olmalı (lost update)
+Stok 0'a yakınken bu oversell demek. Case'in test edeceği tam senaryo bu. Çözüm: aynı ürüne erişimi serialize etmek.
+
+BulkOrderService neden ayrı bean?
+processBulkOrders her siparişi ayrı thread'de orderService.createOrder(...) çağırıyor. createOrder @Transactional. Transaction Spring'de proxy ile çalışır — bean'e dışarıdan girişte devreye girer. Eğer paralel dağıtımı OrderService'in kendi içine koysaydım, this.createOrder(...) çağrısı kendi proxy'sini atlardı (self-invocation) ve transaction hiç başlamazdı. Ayrı bean olunca BulkOrderService, enjekte edilmiş OrderService proxy'sini çağırır → her görev gerçek bir transaction açar. (Bu, "proxy tuzağı"nın somut örneği; B bölümünde tekrar değineceğiz.)
+
+İkinci sebep SRP: tek-sipariş use-case'i (OrderService) ile paralel-orkestrasyon (BulkOrderService) farklı sorumluluklar.
+
+Bulk neden @Transactional DEĞİL?
+Transaction thread-bound'dur (Spring transaction context'i bir ThreadLocal'da tutulur, thread'ler arası yayılmaz). Bulk metoduna @Transactional koysaydım:
+
+O transaction sadece bulk'ı çağıran thread'de açılırdı; CompletableFuture görevleri başka thread'lerde koştuğu için o transaction'a katılmazlardı → faydasız, üstelik yanıltıcı.
+Asıl istediğimiz izolasyon: her sipariş kendi transaction'ında açılıp commit/rollback olsun ki birinin rollback'i diğerini etkilemesin. Bunu, her görevin executor thread'inde kendi createOrder transaction'ını açmasıyla elde ediyoruz. Yani bulk'ı kasıtlı olarak transaction'sız bıraktım; transaction sınırı tek sipariş seviyesinde.
+CompletableFuture + bounded thread pool
+CompletableFuture.supplyAsync(() -> processOne(index, command), executor)
+commonPool() değil, özel executor (AsyncConfig): core 10 / max 20 / queue 50, CallerRunsPolicy. Neden? supplyAsync'in default'u JVM-wide ForkJoinPool.commonPool()'dur; bizim görevlerimiz bloklayan JDBC işi yapıyor (pessimistic lock'ta bekleme dahil). Ortak havuzu doldurursak JVM'deki başka işleri (paralel stream'ler vb.) aç bırakırız. Bounded havuz hem izolasyon hem back-pressure verir.
+CallerRunsPolicy: queue+pool dolarsa görevi reddetmek yerine çağıran thread çalıştırır → ani yükte sipariş düşmez, doğal olarak yavaşlar. Alternatif AbortPolicy olurdu (reddeder, sipariş kaybı) — istemeyiz.
+Hata izolasyonu nasıl?
+private BulkOrderResult processOne(int index, CreateOrderCommand cmd) {
+    try { return BulkOrderResult.success(index, orderService.createOrder(cmd).getId()); }
+    catch (Exception e) { return BulkOrderResult.failed(index, e.getMessage()); }
+}
+Her görev hatayı kendi içinde yakalar ve bir sonuç objesine çevirir. Böylece:
+
+join() patlamaz (exception future'dan dışarı sızmaz),
+bir siparişin rollback'i kendi transaction'ıyla sınırlı kalır,
+yanıt her sipariş için {index, status, orderId|error} taşır.
+🔑 Trade-off: Pessimistic vs Optimistic vs Atomic Update
+Mülakatta en kritik karşılaştırma. Test senaryosu tek hot row'a yüzlerce eşzamanlı istek:
+
+Pessimistic (seçtiğim)	Optimistic (@Version + retry)	Atomic UPDATE
+Mekanizma	SELECT … FOR UPDATE, satır kilidi	commit'te version çakışması → retry	UPDATE … WHERE stock>=:q
+Hot row davranışı	Temiz serialize	Retry storm	Tam concurrent, en hızlı
+Hata tipi	İş hatası (yetersiz stok)	OptimisticLockException (lock hatası)	İş hatası (0 satır)
+Test determinizmi	✅ kesin	❌ flaky, retry tükenmesi	✅ kesin
+JPA uyumu	✅ tam	✅ tam	❌ context'i bypass eder, entity bayatlar
+Domain modeli	✅ invariant entity'de	✅	❌ kural SQL'e kaçar
+Optimistic'i neden reddettim: Tek satırda 100 istek → her turda 1 kazanır, 99'u version çakışıp OptimisticLockException alır. Retry gerekir; maxAttempts=3 ile çoğu tükenip false-fail olur — yani stok varken bile "hata" döner, bug gibi görünür. Düşük çekişmede optimistic mükemmel; ama burada tam test edilen noktada en kırılgan. (Bonus: optimistic'i retry'la kursaydık @Retryable'ı @Transactional'ın dışına sarmak gerekirdi — aynı metoda koyarsan kirlenmiş transaction içinde retry'lar, işe yaramaz. Pessimistic seçince bu tuzak da yok oldu, retry bağımlılığını bile kaldırdık.)
+Atomic UPDATE neden değil: Aslında en sağlam/performanslı o. Ama JPA persistence context'ini bypass eder (bellekteki Product bayatlar, @Version JPA üzerinden artmaz), invariant'ı domain'den SQL'e taşır. Bizim hedef rich domain + transaction/locking anlayışını göstermek; ayrıca çok-ürünlü siparişte yine de etrafına transaction gerekir → hibrit olur. Ne zaman atomic? Çok sayıda farklı ürünlü, yüksek-throughput gerçek production envanteri (bunu "ölçeklenince" kısmında konuşacağız).
+Deadlock-freedom (kilit sırası)
+Çok-kalemli siparişte iki transaction ters sırada kilitlerse: T1: A→B, T2: B→A → T1 A'yı tutup B'yi bekler, T2 B'yi tutup A'yı bekler = deadlock. Çözüm: createOrder kalemleri artan productId sırasına sokuyor, herkes aynı sırada kilitliyor → döngü oluşamaz. OrderedLockingConcurrencyTest bunu kanıtlıyor (ters-sıralı 100 paralel sipariş, deadlock yok).
+
+🔑 Trade-off: Bulk neden 200 + per-item sonuç, 207 değil?
+Toplu işlemin kendisi başarılı (çalıştı, hepsini işledi); tekil başarısızlıklar bir hata değil, veridir. Bunu yapısal gövdede taşıyorum: {total, succeeded, failed, results[]}. 207 Multi-Status semantik olarak savunulabilir ama: çoğu HTTP client/proxy 207'yi alışılmadık karşılar, hata gibi ele alabilir; faydası marjinal. 200 + net per-item daha öngörülebilir ve client'ı şaşırtmaz. (Bunu README'de "değerlendirilen alternatif" olarak da not düştüm — bilinçli karar olduğunu gösterir.)
+
+B) Transaction Yönetimi
+Tek @Transactional sınırı
+Sınır tam olarak OrderService.createOrder. Stok düşürme + sipariş/kalem kaydı + ödeme + bildirim hepsi bu sınırın içinde. Transaction girişte açılır, normal dönüşte commit edilir. c adımındaki pessimistic kilit de commit/rollback'e kadar tutulduğu için, "kilitle → işi yap → bitir" tek tutarlı modelde ilerler.
+
+Unchecked exception + default rollback
+Spring @Transactional default olarak yalnızca RuntimeException (unchecked) türevlerinde rollback yapar; checked exception'da yapmaz. Bütün iş istisnalarım (InsufficientStockException, PaymentFailedException, *NotFoundException) RuntimeException türevi → otomatik rollback.
+
+Alternatif/tuzak: Checked exception kullansaydım @Transactional(rollbackFor = Exception.class) yazmayı unutursam, hata fırlatılır ama transaction commit edilir → yarım sipariş/değişmiş stok = sessiz felaket. Unchecked tercihi bu tuzağı baştan kapatıyor.
+
+OrderServiceRollbackTest (ödeme mock'la patlatılır) ve MultiItemOrderTest (ikinci kalem stoksuz) ikisi de "hata → hiçbir şey kalıcı değil"i kanıtlıyor — ikincisi ilk kalemin bellekte düşülen stoğunun bile geri sarıldığını gösteriyor.
+
+Self-invocation / proxy tuzağı
+@Transactional (ve @Async, @Cacheable …) proxy ile çalışır: Spring bean'i sarmalar, çağrı proxy'den geçince davranış eklenir. Ama aynı sınıf içinden this.method() çağrısı proxy'yi atlar → anotasyon hiç çalışmaz. En sık "neden transaction başlamıyor / neden retry olmuyor" hatası budur. Bizde:
+
+createOrder controller'dan (farklı bean) çağrılıyor → proxy devrede ✅
+Bulk dağıtımı OrderService içinde değil, ayrı BulkOrderService'te → orderService.createOrder enjekte edilmiş proxy üzerinden → her görev gerçek transaction ✅
+Propagation: neden REQUIRED (default), REQUIRES_NEW değil?
+Default REQUIRED: var olan transaction'a katılır, yoksa açar. Ödeme adımını ayrı bir REQUIRES_NEW transaction'a koymak cazip görünür ama tehlikeli: ödeme bağımsız commit edilir, sonra sipariş rollback olursa → para alındı, sipariş yok. Bu yüzden ödeme aynı transaction'da. (Gerçek dış gateway olsaydı hikâye değişirdi → Saga; "ölçeklenince".)
+
+C) Design Pattern — Strategy + Registry
+Nasıl çalışıyor?
+PaymentStrategy arayüzü: getPaymentMethod() + pay(amount).
+Her yöntem bir @Component implementasyonu (CreditCard/BankTransfer/Crypto).
+PaymentStrategyRegistry constructor'ına Spring tüm PaymentStrategy bean'lerini List olarak enjekte eder; registry bunları EnumMap<PaymentMethod, PaymentStrategy>'e indeksler. resolve(method) çalışma zamanında doğru stratejiyi verir.
+PaymentService.charge → registry.resolve(method).pay(amount) → sonucu Payment entity'sine çevirir.
+Neden bu pattern? (Open/Closed)
+Yeni ödeme yöntemi eklemek = yalnızca yeni bir @Component yazmak (getPaymentMethod() yeni enum değerini döndürür). Registry, service, controller, hiçbir switch değişmez. Kapalı-değişime/açık-genişlemeye (OCP) birebir uyum. (Bunu Adım 3'te canlı örnekle göstereceğiz.)
+
+🔑 Trade-off: alternatifler
+if/switch (method) PaymentService içinde: En basit görünür ama OCP ihlali — her yeni yöntemde o metodu düzenlersin, dosya şişer, her dalı ayrı test etmek zor. Case'in açıkça ödüllendirdiği "yeni yöntem = mevcut kodu değiştirme" şartını çiğner.
+Factory: Stratejiyi üreten ayrı bir factory yazılabilirdi; ama Spring DI + registry zaten bunu deklaratif yapıyor (bean'leri otomatik toplayıp Map'liyor). Ayrı factory gereksiz katman olurdu.
+Template Method: Ortak bir algoritma iskeleti + değişen adımlar olsaydı uygundu (validate→charge→record gibi sabit sıra). Ama bizim yöntemlerimiz tamamen bağımsız (ortak iskelet yok), o yüzden Strategy daha temiz.
+Sağlamlaştırmalar
+Registry constructor'ı aynı yönteme iki strateji gelirse IllegalStateException fırlatır (fail-fast, sessiz override yerine).
+PaymentRegistryCompletenessTest: @EnumSource(PaymentMethod.class) ile her enum değerinin bir stratejiye çözüldüğünü garantiler → biri enum ekleyip stratejiyi unutursa test patlar (OCP güvencesi).
+Over-engineering değil mi? Hayır: Strategy+Registry'de durduk. AbstractFactory, ayrı config, pluggable SPI gibi katmanlar eklemedik. Case "en az bir pattern, yerinde" diyor; bu tam o ölçüde.
+Benim eklemek istediğim iki şey
+PaymentResult value object'i neden var? Strateji ya başarı (referansla) ya da gerekçeli başarısızlık döndürür — boolean yerine. Böylece "normal red" (CC limiti) PaymentFailedException'a, "beklenmedik hata"dan ayrı, kontrollü biçimde çevrilir. Strateji exception fırlatmıyor; karar PaymentService'te → tek sorumluluk.
+@EntityGraph (detay okuma): getOrderDetail items+payment'ı tek sorguda çeker. Transaction kapandıktan sonra DTO'ya çeviride lazy ilişkiye dokunulursa LazyInitializationException olurdu; entity graph bunu önler (N+1'i de azaltır).
+İstersen bu üç başlıktan birini "mülakatçı modunda" sana sorularla deşeyim (ör. "100 yerine 10.000 paralel gelse pessimistic ne yapar?", "REQUIRES_NEW'u gerçekten istediğin bir durum var mı?"), yoksa Adım 3 — 'yeni bir ödeme yöntemi eklesek nasıl olurdu' canlı örneği'ne geçelim. Hangisi?
+
+Üç odak alanı tamamdır. Adım 3'e geçelim: yeni bir ödeme yöntemi, mesela Apple Pay eklesek baştan sona nasıl olurdu, somut kod örneğiyle göster. Hangi tek dosyayı eklerim, getPaymentMethod ve pay nasıl olur, ve mevcut hiçbir şeyin değişmeden kaldığını yani Open/Closed'ı net göster. Registry'nin yeni stratejiyi otomatik toplayıp resolve ettiğini de anlat. Projeye kalıcı eklememize gerek yok, örnek üzerinden anlatman yeterli; ama istersen geçici ekleyip PaymentRegistryCompletenessTest'in hâlâ yeşil kaldığını da gösterebilirsin. İstersen kalıcı da olabilir. Ayrıca burada Strategy ve Registry patternlerin de nasıl çalıştığını örnek üzerinden göstermeni istiyorum.
+
+Adım 3'e geçelim. Bunu hem anlatacağım hem de gerçekten geçici ekleyip Open/Closed'ı testle kanıtlayacağım, sonra geri alacağım (az önce yalınlaştırdığımız projeye kullanılmayan bir APPLE_PAY bırakmak tutarsız olur — gösterim için ekleyip temizleyeceğim).
+
+Önce kavram: tam olarak ne ekliyorum?
+Yeni yöntem = bir enum değeri (additive) + bir yeni strateji dosyası. Başka hiçbir şey.
+
+Şimdi bunu canlı yapayım — PaymentMethod'a APPLE_PAY ekliyorum ve tek bir yeni dosya yazıyorum:
+
+
+Edited a file, created a file
+Şimdi hiçbir şeyi değiştirmeden testleri çalıştırıyorum — registry'nin yeni stratejiyi otomatik toplayıp APPLE_PAY'i çözdüğünü ve completeness testinin artık 4 enum için koşup yeşil kaldığını görelim:
+
+Ran
+Run tests with APPLE_PAY added
+Kanıt geldi. Tek tek bakalım:
+
+PaymentRegistryCompletenessTest artık 4 test koşuyor (önce 3) — @EnumSource enum'u okuduğu için otomatik olarak APPLE_PAY için de bir vaka üretti ve geçti → registry yeni stratejiyi topladı ve resolve(APPLE_PAY) çalışıyor.
+Toplam 39 → 40 (artan +1 tam da bu otomatik vaka).
+BUILD SUCCESS — başka hiçbir dosya değişmedi.
+Şimdi gösterimi geri alıp 39'a dönelim (projeyi yalın bırakıyoruz):
+
+
+Ran 2 commands, edited a file
+Geri alındı — 39 test yeşil, proje yine yalın ve temiz. Şimdi olan biteni baştan sona bağlayalım.
+
+Adım 3 — Yeni ödeme yöntemi (Apple Pay): baştan sona
+Eklediğim tek dosya
+@Slf4j
+@Component                                   // ← Spring bunu otomatik bean yapar
+public class ApplePayPaymentStrategy implements PaymentStrategy {
+
+    @Override
+    public PaymentMethod getPaymentMethod() {  // ← "ben APPLE_PAY'i işlerim" der
+        return PaymentMethod.APPLE_PAY;
+    }
+
+    @Override
+    public PaymentResult pay(BigDecimal amount) {  // ← bu yöntemin ödeme mantığı
+        String ref = "AP-" + UUID.randomUUID();
+        log.info("Processing APPLE_PAY payment of {} -> ref {}", amount, ref);
+        return PaymentResult.success(ref);
+    }
+}
+Artı tek satır: PaymentMethod enum'una APPLE_PAY değeri. Hepsi bu.
+
+Değişmeyen her şey (Open/Closed kanıtı)
+APPLE_PAY siparişi uçtan uca çalıştı; ama şu dosyaların hiçbirine dokunmadım:
+
+OrderController · OrderService · PaymentService · PaymentStrategyRegistry · OrderMapper/DTO'lar · diğer 3 strateji · hiçbir test.
+
+Yani dispatch eden (yönlendiren) hiçbir kod değişmedi; sadece yeni davranışı ekledim. Bu OCP'nin tam tanımı: genişlemeye açık, değişime kapalı.
+
+Dürüst nüans (mülakatta bunu söylemek artı): "Tek dosya" tam doğru değil — PaymentMethod enum'una da bir değer ekledim. Ama bu additive bir değişiklik (tip-güvenli sözleşmeye yeni bir kelime); davranış/mantık içeren hiçbir yeri düzenlemedim. Kritik fark: ortada güncellenmesi gereken bir switch (method) yok. switch tabanlı tasarımda her yeni yöntemde o mantığı düzenlerdin (değişime kapalı değil); burada sadece yeni bir vokabüler + ayrı dosyada davranışı bildiriyorsun.
+
+Strategy nasıl çalıştı?
+PaymentStrategy bir sözleşme: "hangi yöntemim" (getPaymentMethod) + "nasıl öderim" (pay). Her yöntem bu sözleşmeyi kendi dosyasında uygular. Çağıran taraf (PaymentService) somut sınıfı bilmez, yalnızca arayüze konuşur → ödeme algoritmaları birbirinden ve service'ten izole.
+
+Registry nasıl otomatik topladı?
+@Component
+public class PaymentStrategyRegistry {
+    private final Map<PaymentMethod, PaymentStrategy> strategies = new EnumMap<>(PaymentMethod.class);
+
+    public PaymentStrategyRegistry(List<PaymentStrategy> strategyBeans) {   // ← (1)
+        for (PaymentStrategy s : strategyBeans) {
+            if (strategies.put(s.getPaymentMethod(), s) != null) {          // ← (2)
+                throw new IllegalStateException("Duplicate strategy for " + s.getPaymentMethod());
+            }
+        }
+    }
+    public PaymentStrategy resolve(PaymentMethod method) {                  // ← (3)
+        PaymentStrategy s = strategies.get(method);
+        if (s == null) throw new IllegalArgumentException("No strategy for " + method);
+        return s;
+    }
+}
+Spring, List<PaymentStrategy>'e o tipteki TÜM @Component bean'leri enjekte eder. ApplePayPaymentStrategy'yi yazıp @Component koyduğum an, bu listeye otomatik girdi — registry'ye elle kayıt yok.
+Her stratejiyi kendi getPaymentMethod()'una göre EnumMap'e indeksler. (Aynı yönteme iki strateji gelirse fail-fast IllegalStateException — sessiz override yok.)
+resolve(method) çalışma zamanında O(1) doğru stratejiyi verir.
+Bir APPLE_PAY isteği geldiğinde (runtime)
+POST /api/orders {paymentMethod:"APPLE_PAY", ...}
+  → OrderService.createOrder (değişmedi)
+     → PaymentService.charge(APPLE_PAY, total)
+        → registry.resolve(APPLE_PAY)         → ApplePayPaymentStrategy  (EnumMap'ten)
+        → strategy.pay(total)                  → PaymentResult.success("AP-…")
+     → Payment(COMPLETED, ref) → order.attachPayment(...)
+Yönlendirme kodu hiç değişmeden yeni yöntemi işledi.
+
+Güvenlik ağı: completeness testi neden otomatik büyüdü?
+PaymentRegistryCompletenessTest @EnumSource(PaymentMethod.class) kullanıyor — yani enum'u okur. APPLE_PAY ekleyince test otomatik 3'ten 4 vakaya çıktı ve resolve(APPLE_PAY)'in null olmadığını doğruladı. Tersi senaryo da kıymetli: enum'a değer ekleyip stratejiyi yazmayı unutsaydım, bu test anında patlardı (resolve IllegalArgumentException atar). Yani OCP'yi bir testle zorluyoruz — "yeni yöntem mevcut kodu kırmaz" sözünü makineyle garanti altına aldık.
+
+İskelet + üç odak + canlı OCP örneği oturdu. İstersen Adım 4 — SOLID & design-pattern gözden geçirmesi (her şey doğru yerde mi, gereksiz/eksik soyutlama var mı, SRP/DIP/ISP nerede görünüyor) ile devam edelim; yoksa burada Strategy/Registry üzerine "mülakatçı sorusu" pratiği yapabiliriz. Nasıl istersin?
+
+Adım 3 de oturdu, Open/Closed'ı canlı görmek iyiydi. Şimdi Adım 4. SOLID ve design pattern açısından bir gözden geçirme yapalım. Projede beş SOLID prensibinin her birinin nerede görüldüğünü somut dosyalarla göster. Bir de bana dürüst bir değerlendirme yap: her soyutlama gerçekten yerinde mi, gereksiz/gösteriş için eklenmiş bir katman var mı, ya da tam tersi eksik bırakılmış bir yer var mı? Mülakatta "burayı neden böyle kurguladın" diye soracakları için kararları savunabilmek istiyorum; o yüzden güçlü yanlar kadar zayıf/tartışmalı noktaları da açıkça söyle, "şöyle de yapılabilirdi ama şu yüzden böyle seçtim" diyebileyim. Projede eklenmesi gereken veya gereksiz olarak gördüğün bir pattern veya SOLID prensibi kullanımı var mı bunları da ayrıca söyle.  'şu pattern gereksiz', 'şu prensip eksik kalmış' ya da 'hepsi yerinde, eklenecek/çıkarılacak yok' gibi bildir.
+
+Adım 4. Burada gerçekten dürüst olacağım — sadece övmek işine yaramaz; mülakatta zayıf noktayı sen söyleyebilirsen güçlü görünürsün.
+
+Adım 4 — SOLID & Design Pattern gözden geçirmesi
+Beş prensip, somut dosyalarla
+S — Single Responsibility
+Her sınıfın tek değişme sebebi var: OrderController (HTTP), OrderService (sipariş use-case + tx sınırı), ProductService (ürün ops), PaymentService (ödeme dispatch→entity), NotificationService (bildirim), BulkOrderService (paralel orkestrasyon), OrderMapper/ProductMapper (çeviri), GlobalExceptionHandler (hata→HTTP). En net örnek: paralel dağıtımı OrderService'e tıkıştırmayıp BulkOrderService olarak ayırmak.
+
+O — Open/Closed
+PaymentStrategy + PaymentStrategyRegistry (Adım 3'te canlı gördük). Yeni yöntem = yeni @Component, dispatch kodu değişmez.
+
+L — Liskov Substitution
+PaymentService, hangi strateji olduğunu bilmeden PaymentStrategy arayüzüyle çalışır — instanceof/downcast yok. CreditCardPaymentStrategy limit kontrolü ekler ama sözleşmeyi bozmaz: normal redde exception fırlatmaz, PaymentResult.failure döner (arayüzün sözleşmesi bu). Yani her strateji yerine geçebilir.
+
+I — Interface Segregation
+Bizim yazdığımız arayüz PaymentStrategy minik ve odaklı (2 metot) — kimse kullanmadığı metoda bağımlı değil. Repository'lerde de sadece ihtiyacımız olan sorguları açıyoruz (findByIdForUpdate, findWithDetailsById).
+
+D — Dependency Inversion
+Anlamlı sınırlarda soyutlamaya bağlanıyoruz: PaymentService → PaymentStrategy (somut stratejilere değil); registry List<PaymentStrategy> enjekte eder; repository'ler Spring Data arayüzleri. Yüksek seviye (OrderService) düşük seviye detaya (somut ödeme/persistence) değil, soyutlamalara bağlı.
+
+Dürüst değerlendirme
+Güçlü ve gerçekten yerinde
+Strategy + Registry: Case'in açıkça istediği genişletilebilirliğin birebir karşılığı; üstelik Strategy+Registry'de durduk — AbstractFactory, SPI, ayrı config eklemedik. Gösteriş yok.
+PaymentResult value object: "Normal red"i (CC limiti) beklenmedik hatadan ayırır; stratejiyi exception'sız tutup kararı PaymentService'e bırakır. Temiz LSP sözleşmesi.
+Rich domain: invariant'lar entity'de (decreaseStock, OrderItem.of). Servisler ince orkestratör.
+@EntityGraph, bounded executor, externalized properties: hepsi somut bir sorunu çözüyor (lazy hatası, commonPool starvation, configurability), "havalı olsun" diye değil.
+Zayıf / tartışmalı (savunmanı buradan kur)
+1. (En önemlisi) @Setter invariant'ı sızdırıyor.
+Product.decreaseStock "stok negatif olamaz"ı korur — ama Lombok @Setter, setStockQuantity(int) de üretir; teoride biri bununla stoğu doğrudan (hatta negatife) set edip guard'ı bypass edebilir. Rich-domain iddiasını zayıflatan tek gerçek nokta bu.
+
+"Şöyle de yapılabilirdi": Toptan @Setter yerine yalnızca gereken mutator'ları (ör. bidirectional için OrderItem.setOrder) bırakıp gerisini kaldırırdım; o zaman invariant tamamen kapanırdı. Kısalık/JPA kolaylığı için @Setter bıraktım, ama farkındayım — istersen şimdi sıkılaştırabiliriz.
+
+2. BulkOrderResult (service) ↔ BulkOrderItemResponse (api) neredeyse aynı.
+İki benzer kayıt var.
+
+"Şöyle de yapılabilirdi": Controller doğrudan BulkOrderResult döndürebilirdi — ama o zaman API katmanı service tipine bağlanırdı. Ayrı response + toBulkResponse (total/succeeded/failed özetini de ekliyor) bu bağımlılığı kesiyor. Bilinçli katman; ama "ince çoğaltma" diye eleştirilebileceğini kabul ediyorum.
+
+3. Service'lerin arayüzü yok (DIP nüansı).
+OrderController somut OrderService'e bağlı, arayüze değil.
+
+"Şöyle de yapılabilirdi": OrderService arayüzü + OrderServiceImpl. Ama tek implementasyon için arayüz açmak "her şeye interface" anti-pattern'i / spekülatif genellik olurdu. DIP'i soyutlamanın kazanç sağladığı yerlerde uyguladım (ödeme stratejileri, repository'ler), gereksiz yere değil. Bu bilinçli bir karar, eksiklik değil — ve mülakatta savunması güçlü.
+
+4. ISP'de çerçeve maliyeti.
+Repository arayüzlerimiz ince ama JpaRepository'yi extend ettikleri için aslında onlarca metot (save/delete/findAll…) miras alıyorlar — hepsini kullanmıyoruz.
+
+Bu bizim tasarım kusurumuz değil, Spring Data'nın idiyomatik bedeli. İstersek Repository/CrudRepository'den daha dar bir taban seçebilirdik; pratikte kazanç düşük olduğu için JpaRepository'de kaldım.
+
+5. CreateOrderCommand inceliği.
+"Request DTO yetmez miydi?" denebilir. Yetmezdi: service'i web tipinden bağımsız tutuyor (service api paketini import etmemeli). İnce ama gerçek bir sınır.
+
+Net verdict (eklenecek / çıkarılacak)
+Çıkarılacak pattern: yok. Hiçbir pattern gösteriş için değil; restraint (Template Method/Observer/Saga/Factory eklememek) doğru.
+Eksik kalan prensip: yok. DIP'in service'lere uygulanmaması bilinçli ve doğru; ISP'deki gevşeklik çerçeve kaynaklı.
+Tek somut iyileştirme önerim: #1 — entity'lerde toptan @Setter'ı kaldırıp yalnızca gereken mutator'ları bırakmak. Bu, rich-domain invariant'ını tamamen kapatır ve "stoğu setter'la bypass edebilir miyim?" sorusunu baştan yok eder. Küçük, güvenli ve hikâyeni güçlendiren bir rötuş.
+Geri kalan her şey yerinde. #2–#5 değiştirmeye değmez; sadece bilinçli trade-off olarak açıklayabilmen yeterli.
+
+İstersen #1'i şimdi uygulayalım (toptan @Setter'ı kaldırır, setOrder gibi gerekli mutator'ları açık bırakır, invariant'ı tam kapatır, mvn test ile doğrularım) — yoksa olduğu gibi bırakıp mülakatta trade-off olarak anlatırsın. Sonrasında Adım 5 — testleri tek tek "neyi kanıtlıyor" turuna geçeriz. Nasıl ilerleyelim?
+
+Değerlendirme çok iyi. #1'i uygulayalım: entity'lerden toptan @Setter'ı kaldır, sadece gerçekten gereken mutator'ları bırak. Böylece stok yalnızca decreaseStock ve changeStockTo üzerinden, kural kontrollü değişsin. Bitince mvn test ile her şeyin yeşil kaldığını doğrula. #2-#5'i bilinçli trade-off olarak olduğu gibi bırakıyoruz.
+
+Bu bitince Adım 5'e geçelim. testleri tek tek "hangi test neyi kanıtlıyor, nasıl çalışıyor, mantıkları nelerdir, neler işliyor" turuna geçelim. Yani testleri tanıyalım.
+
+#1'i uyguluyorum. Önce hangi setter'ların gerçekten çağrıldığını koddan teyit edeyim (kör kaldırma yapmayayım):
+
+Searched
+\.set[A-Z]\w*\(
+Teyit edildi: tek kullanılan entity setter'ı OrderItem.setOrder ve Payment.setOrder (ikisi de Order içinde bidirectional için). Diğer .set...'ler executor/servis, entity değil. Demek ki Product ve Order'dan @Setter'ı tamamen kaldırabilirim; OrderItem ve Payment'ta yalnızca setOrder'ı açık bırakırım. Dosyaları okuyup düzenleyeyim:
+
+
+Read 2 files
+Şimdi düzenlemeleri yapıyorum — Product ve Order'dan @Setter tamamen kaldırılıyor; OrderItem ve Payment'ta yerine paket-özel setOrder (yalnızca aggregate olan Order bağlayabilsin):
+
+
+Edited 4 files
+@Setter kaldırıldı, stok artık yalnızca decreaseStock/changeStockTo üzerinden kural kontrollü değişebilir. Doğrulayalım:
+
+Ran
+Run tests after removing blanket @Setter
+39 test yeşil, BUILD SUCCESS. Invariant artık tam kapalı: stok yalnızca decreaseStock/changeStockTo üzerinden değişebilir, geri-referanslar da paket-özel setOrder ile sadece Order tarafından bağlanır. (Hibernate alan-erişimi kullandığı için public setter'a ihtiyaç yok; testlerin geçmesi bunu kanıtladı.) Kararı AI_NOTES'a da işleyeyim:
+
+Edited
+AI_NOTES.md
++5
+-0
+Mükemmel, #1 tamam. Şimdi son adım — testleri tanıyalım. 39 testi piramit katmanlarına göre gezeceğim; her biri için neyi kanıtlıyor + nasıl çalışıyor + kilit assertion.
+
+Adım 5 — Test turu (39 test, 15 sınıf)
+Piramit şekli: Çoğu saf birim (Spring yok, milisaniye); daha az integration (@SpringBootTest + gerçek H2); 1 web slice (@WebMvcTest). Hızlılar tabanda, pahalılar tepede — doğru piramit.
+
+1) Saf birim — domain invariant'ları (context yok)
+ProductTest (4) — stok kuralının kalbi, izole:
+
+decreaseStock_reducesQuantity: 10→7.
+decreaseStock_downToZero_isAllowed: 5→0 (sınır, hata değil).
+decreaseStock_whenInsufficient_throwsAndLeavesStockUntouched: stok 2, istek 5 → InsufficientStockException (available=2, requested=5) ve stok 2'de kalır (atılınca yan etki yok).
+decreaseStock_withNonPositiveQuantity_throws: 0 ve -1 → IllegalArgumentException.
+Kanıt: "stok negatif olamaz" kuralı entity'de, Spring'e gerek olmadan. En hızlı, en odaklı testler.
+
+OrderItemTest (2):
+
+of_snapshotsUnitPriceAndComputesSubtotal: fiyat 19.99 × 3 → unitPrice 19.99 (snapshot), subtotal 59.97.
+of_withNonPositiveQuantity_throws: qty 0 → IllegalArgumentException.
+Kanıt: fiyat snapshot'ı + subtotal hesabı entity'de.
+
+2) Saf birim — ödeme alt sistemi
+PaymentStrategyTest (4) — her strateji + CC limiti:
+
+CC/BT/Crypto: doğru getPaymentMethod() + başarılı sonuç, referans önekleri CC-/BT-/CRYPTO-.
+creditCard_atLimitApproves_overLimitDeclines: 10000 onay, 10000.01 red (mesajda "limit"). Sınır davranışı.
+PaymentStrategyRegistryTest (3) — Mockito ile:
+
+resolve_returnsStrategyMatchingTheMethod: 3 gerçek strateji → her biri doğru sınıfa çözülür.
+resolve_unregisteredMethod_throws: sadece CC'li registry → resolve(CRYPTO) → IllegalArgumentException.
+construction_withDuplicateMethod_failsFast: aynı yöntemi dönen iki mock strateji → IllegalStateException.
+Kanıt: registry çözümleme + sessiz override yerine fail-fast.
+
+PaymentServiceTest (2) — @ExtendWith(MockitoExtension), registry+strategy mock'lu:
+
+charge_onApproval_buildsCompletedPayment: success → Payment(COMPLETED, ref, amount, method).
+charge_onDecline_throwsPaymentFailed: failure result → PaymentFailedException.
+Kanıt: "sonuç→entity / redde exception" mantığı, DB olmadan izole.
+
+3) Saf birim — mapper'lar
+OrderMapperTest (4): toResponse (item+payment alanları), payment'sız → null alanlar, toCommand (request→command), toBulkResponse (3 sonuç → total 3/succeeded 2/failed 1).
+ProductMapperTest (1): tüm alan kopyası.
+
+Kanıt: entity/command ↔ DTO çevirisi doğru; entity dışarı sızmıyor.
+
+4) Integration — transaction & atomiklik (@SpringBootTest + gerçek H2)
+OrderServiceRollbackTest (1) — @MockBean PaymentService:
+
+Ürün stok 10 kaydet; paymentService.charge(...) mock'u PaymentFailedException fırlatsın; createOrder → exception bekle; stok hâlâ 10, sipariş sayısı değişmemiş.
+Kanıt: ödeme patlayınca tam rollback. Mekanizma: @MockBean ile hatayı deterministik enjekte ediyoruz. Bonus: spring-boot-starter-aop kaldırıldıktan sonra proxy-@Transactional'ın hâlâ çalıştığını da kanıtlar.
+
+MultiItemOrderTest (2):
+
+happyPath...: A(stok10,₺100) + B(stok5,₺50), sipariş A×2+B×3 → CONFIRMED, payment COMPLETED, total 350, A→8, B→2, sipariş +1.
+secondItemOutOfStock_rollsBackEverything: A(10) + B(1), sipariş A×2 + B×5 → InsufficientStockException; A hâlâ 10 (ilk kilitlenip bellekte düşülmesine rağmen), B hâlâ 1, sipariş/ödeme yok.
+Kanıt: çok-kalemli atomiklik; stok kaynaklı rollback (ödeme değil farklı tetikleyici) ve ilk kalemin bile geri sarıldığı.
+
+5) Integration — eşzamanlılık (testlerin kalbi)
+OrderConcurrencyTest (1) — CountDownLatch ile deterministik:
+
+Stok 10; 50 thread her biri qty1 sipariş. startGate (1) ile hepsi aynı anda salınır, doneGate (50) ile beklenir.
+Assertion: tam 10 başarılı, 40 InsufficientStock, son stok 0, başarılı + kalan stok == 10.
+Kanıt: yük altında oversell yok. Neden CountDownLatch? Thread.sleep flaky/non-deterministik olurdu; latch ile gerçek eşzamanlılığı kesin kurguluyoruz. Kesin sayı (==10, ≥ değil) — fazla satışı matematiksel olarak dışlıyor.
+
+OrderedLockingConcurrencyTest (1):
+
+A&B stok 1000; 10 thread [A,B] + 10 thread [B,A], her biri 5 tur = 100 sipariş, hepsi startGate ile birlikte.
+doneGate.await(60s) → finished true (deadlock olsa timeout'a düşer, test fail), hata yok, 100 başarılı, A&B → 900.
+Kanıt: artan-id kilit sıralaması → deadlock yok. Sıralama olmasaydı ters-sıra bu testte kilitlenirdi.
+
+BulkOrderIsolationTest (1):
+
+Ürün stok 5; bulk [qty3 ✓, qty10 ✗, qty2 ✓] → BulkOrderService.
+index0 SUCCESS+orderId, index1 FAILED + "insufficient stock" + orderId null, index2 SUCCESS; son stok 0.
+Kanıt: paralelde hata izolasyonu — biri patlasa diğerleri etkilenmez, per-item sonuç doğru.
+
+6) Web slice — HTTP sözleşmesi (@WebMvcTest + MockMvc, servisler mock)
+OrderApiRegressionTest (8) — her vaka status + ApiError gövdesi (status/error/message/path) assert eder:
+
+404 (ürün yok), 404 (sipariş yok), 400 (bozuk JSON), 400 (geçersiz enum), 400 (tip uyuşmazlığı /abc), 400 (alan validation quantity), 409 (yetersiz stok), 422 (ödeme reddi).
+Kanıt: tüm hata matrisi. Mekanizma: sadece web katmanı yüklenir (servisler @MockBean, WebConfig hariç) → hızlı ve izole; servisler exception fırlatacak şekilde stub'lanır, GlobalExceptionHandler'ın doğru kodu/gövdeyi ürettiği doğrulanır.
+
+7) OCP güvenlik ağı & limit (integration)
+PaymentRegistryCompletenessTest (3) — @ParameterizedTest @EnumSource(PaymentMethod.class):
+
+Her enum değeri için wired registry'de resolve(method) != null.
+Kanıt: her ödeme yönteminin bir stratejisi var; enum büyüyünce test otomatik büyür (Adım 3'te 4'e çıkmıştı). Strateji unutulursa patlar.
+
+CreditCardLimitTest (2) — gerçek strateji, mock yok:
+
+creditCardOverLimit_declinesAndRollsBack: ₺6000×2=12000 > 10000 → PaymentFailedException, stok 10'da, sipariş yok.
+bankTransferSameAmount_succeeds: aynı 12000 BANK_TRANSFER ile → CONFIRMED/COMPLETED.
+Kanıt: CC limiti gerçek akışta 422+rollback tetikler ve limit yalnızca CC'ye özel.
+
+Mülakatta vurgulayacağın test kararları
+Determinizm: CountDownLatch/CyclicBarrier mantığı, Thread.sleep yok → flaky değil.
+Rollback'i iki farklı tetikleyiciyle test ettim: ödeme (@MockBean) ve stok (gerçek).
+Kesin sayı assertion'ları (==10) → oversell'i matematiksel dışlar, "yaklaşık" değil.
+Doğru araç doğru yerde: saf birim (hız), Mockito (izolasyon), @SpringBootTest (gerçek tx/lock), @WebMvcTest (hızlı HTTP slice), @EnumSource (kendini güncelleyen kapsam).
+Context cache: mock'suz @SpringBootTest'ler aynı context'i paylaşır; sadece OrderServiceRollbackTest (@MockBean) ayrı → suite hızlı.
+Bu, planının 5 adımını da tamamlıyor. İstersen herhangi bir testi "mülakatçı modunda" sorularla deşeyim (ör. "50 thread testinde neden tam 10 başarılı olduğundan eminsin?", "@WebMvcTest neden tüm context'i yüklemiyor?"), ya da genel bir kapanış/özet yapıp teslimat öncesi son kontrol listesini çıkarayım. Nasıl ilerleyelim?
+
+Teslime yaklaştık, birkaç son rötuş ve kontrol istiyorum.
+
+1) Çalıştırma/test komutları: mvn spring-boot:run ve mvn test ana komut olarak kalsın (normal bir klonda doğru çalışıyorlar). Bunların altına kısa bir "Windows / ASCII-dışı (ör. Türkçe karakterli) klasör yolu" notu ekle: orada mvn spring-boot:run forklanan JVM yüzünden patlıyor, çalışan alternatif mvn clean package -DskipTests + java -jar target/order-service-0.0.1-SNAPSHOT.jar, testler için de mvn test -DforkCount=0.
+
+2) Transaction/rollback bölümüne PowerShell ekle: README'deki "Transaction / rollback senaryosunu test etme" bölümünde şu an Unix tarzı bir curl örneği var ama bu Windows PowerShell'de çalışmıyor (PowerShell'de curl, Invoke-WebRequest'in takma adıdır, -X tanımaz). Mevcut Unix örneği kalsın (Mac/Linux için), altına bir de Windows PowerShell versiyonunu ekle. İki şey olsun:
+
+
+
+
+
+Elle manuel kontrol (PowerShell): PowerShell'de Invoke-RestMethod hata gövdesini güvenilmez gösterdiği için, manuel doğrulamayı curl.exe -i ile ver: JSON'u bir body.json dosyasına yazıp curl.exe -s -i -X POST .../api/orders --data "@body.json" ile 409 durum satırını + gövdesini göster, ardından Invoke-RestMethod .../api/products/2 ile stoğun değişmediğini (rollback) doğrula. Örnek olarak: 
+
+# JSON'u dosyaya yaz (tırnak derdi olmasın)
+
+'{"customerId":7,"paymentMethod":"CRYPTO","items":[{"productId":2,"quantity":5},{"productId":8,"quantity":100}]}' | Out-File -Encoding ascii body.json
+
+# -i = durum satırı + gövde birlikte
+
+curl.exe -s -i -X POST http://localhost:8080/api/orders -H "Content-Type: application/json" --data "@body.json"
+
+# rollback kanıtı:
+
+(Invoke-RestMethod http://localhost:8080/api/products/2).stockQuantity   # hâlâ 200 olmalı
+
+
+
+Otomatik testleri terminalden koşturma: bu bölümde adı geçen iki testi tek komutla çalıştırma satırı: mvn test -DforkCount=0 "-Dtest=OrderServiceRollbackTest,MultiItemOrderTest" (PowerShell'de virgülü tanısın diye -Dtest=... tırnak içinde).
+
+3) AI_NOTES.md şu an İngilizce; İngilizce kısım aynen kalsın ama dosyanın altına aynı içeriğin Türkçe çevirisini de ekle.
+
+4) Son bir README gözden geçirmesi yap: case şunları istiyor — tek komutla çalıştırma, tek komutla test, örnek istekler, transaction/rollback senaryosunun nasıl test edileceği, tasarım kararlarına dair kısa notlar. Hepsi tam mı, eksik/yanlış kalmış bir şey var mı kontrol et ve söyle.
+
+5) Son olarak senin gözünden: teslime hazır mı, gözden kaçan ya da "eklesek iyi olur" dediğin bir şey var mı? (Not: AI sohbet geçmişini ben ekleyeceğim, ona takılma; GitHub push da güncel, ona da takılma.)
+
+Hepsini sırayla yapayım. Önce README ve AI_NOTES'un güncel halini okuyayım ki düzenlemeler isabetli olsun:
+
+Read
+README.md
+README'yi okudum. Bir hata da gördüm: satır 32 "36 test" diyor ama artık 39. Şimdi AI_NOTES'u da okuyup hepsini düzenleyeyim:
+
+Read
+AI_NOTES.md
+Şimdi düzenlemeleri yapıyorum.
+
+1) Test sayısı düzeltme + Windows/ASCII-dışı yol notu:
+
+Edited
+README.md
++15
+-1
+2) Transaction/rollback bölümüne Windows PowerShell versiyonu:
+
+Edited
+README.md
++20
+-0
+3) AI_NOTES.md'ye Türkçe çeviriyi ekliyorum (İngilizce kısım aynen kalıyor):
+
+Edited
+AI_NOTES.md
++132
+-0
+Şimdi son kontroller. README'de başka "36" kalmadığını ve yapının sağlam olduğunu teyit edeyim:
+
+Searched
+36 test|forkCount|curl\.exe|body\.json|^##
+Hepsi tamam. Son durum raporu:
+
+Yapılanlar (1–3)
+1) Windows/ASCII-dışı yol notu — "Test (tek komut)" altına eklendi: mvn spring-boot:run Türkçe-karakterli yolda forklanan JVM yüzünden patlıyor; alternatif mvn clean package -DskipTests + java -jar target/order-service-0.0.1-SNAPSHOT.jar, testler için mvn test -DforkCount=0. Ana komutlar (mvn spring-boot:run / mvn test) yerinde kaldı.
+
+2) Transaction/rollback bölümüne PowerShell — mevcut Unix curl örneği duruyor; altına eklendi:
+
+curl.exe -i + body.json ile 409 durum satırı+gövde, ardından (Invoke-RestMethod …/api/products/2).stockQuantity ile rollback kanıtı (curl/Invoke-RestMethod tuzakları açıklandı).
+İki testi tek komut: mvn test -DforkCount=0 "-Dtest=OrderServiceRollbackTest,MultiItemOrderTest".
+3) AI_NOTES.md — İngilizce kısım aynen kaldı; altına --- ile ayrılmış tam Türkçe çeviri eklendi (11 karar + yerel ortam notu).
+
+Bir de yol üstünde bulduğum hatayı düzelttim: README "36 test" diyordu → 39 yapıldı.
+
+4) README case-gereksinim denetimi
+Case istiyor	Durum
+Tek komutla çalıştırma	✅ ## Çalıştırma (tek komut) → mvn spring-boot:run
+Tek komutla test	✅ ## Test (tek komut) → mvn test
+Örnek istekler	✅ tek sipariş (201), bulk (200 per-item), hata modeli
+Transaction/rollback nasıl test edilir	✅ otomatik testler + Unix curl + PowerShell + eşzamanlılık bölümü
+Tasarım kararlarına dair kısa notlar	✅ ## Tasarım kararları (locking/atomic gerekçesi, tx sınırı, Strategy+Registry, bağımlılık sadeliği, domain)
+Hepsi tam ve tutarlı. Ek olarak case'in istediği AI-şeffaflık bölümü de var. Eksik/yanlış kalan yok (tek bulduğum yanlış olan test sayısını düzelttim).
+
+5) Teslime hazır mı? — Değerlendirmem
+Evet, teslime hazır. Özet:
+
+Üç odak alanı (paralel/transaction/pattern) eksiksiz ve 39 test ile kanıtlı, hepsi yeşil.
+Kod yalın (ölü kod yok, invariant @Setter ile bypass edilemez), katmanlar net.
+Dokümantasyon case'in beklediği her maddeyi karşılıyor; Windows/PowerShell dahil çalıştırma yolları net.
+Docker uçtan uca doğrulandı; test paneli same-origin çalışıyor.
+Senin üstlendiğin (takılmamı istemediğin) iki şey: AI sohbet geçmişini ekleme + GitHub push. (README'de "tam sohbet geçmişi teslimata eklenmiştir" cümlesi, sen ekleyince doğru olacak — eklemeyi unutma yeter.)
+
+"Eklesek iyi olur" dediğim tek (çok küçük, opsiyonel) şey: PowerShell örneği artık kullanıcıya body.json oluşturmasını söylüyor; istersen .gitignore'a body.json ekleyebiliriz ki klonda yanlışlıkla commit'lenmesin. Şart değil — sadece düzen için. İstersen ekleyeyim; istemezsen proje bu haliyle gönderilebilir.
+
+Başka bir dokunuş istemiyorsan, benden taraf iş bitti — kolay gelsin. 🎯
+
+README'deki "Transaction / rollback senaryosunu test etme" bölümüne PowerShell manuel kontrolünü eklemişsin ama şu an sadece stok kaynaklı rollback örneği var (Mouse+Pen → 409, MultiItemOrderTest'in karşılığı). Bu bölümde iki otomatik test listeleniyor; ikincisinin (OrderServiceRollbackTest — ödeme patlayınca rollback) de canlı bir karşılığı olsun istiyorum.
+Mevcut 409 örneğinin hemen altına, ödeme kaynaklı rollback için ikinci bir PowerShell bloğu ekle. Bunu canlı test ettim, çalışıyor: limiti aşan bir kredi kartı siparişi → 422 → stok geri sarılır:
+
+# Ödeme kaynaklı rollback (OrderServiceRollbackTest'in canlı karşılığı):
+# Laptop(id=1) x7 = 10.499,93 > 10.000 kredi kartı limiti → ödeme reddi (422)
+'{"customerId":7,"paymentMethod":"CREDIT_CARD","items":[{"productId":1,"quantity":7}]}' | Out-File -Encoding ascii body.json
+curl.exe -s -i -X POST http://localhost:8080/api/orders -H "Content-Type: application/json" --data "@body.json"
+# rollback kanıtı: Laptop stoğu hâlâ 25 olmalı
+(Invoke-RestMethod http://localhost:8080/api/products/1).stockQuantity
+İki örneği kısaca etiketle ki hangisi hangi testin karşılığı belli olsun: ilki stok kaynaklı (409) → MultiItemOrderTest, ikincisi ödeme kaynaklı (422) → OrderServiceRollbackTest. Küçük bir dürüst not da ekleyebilirsin: OrderServiceRollbackTest testin içinde ödemeyi @MockBean ile patlatıyor; manuel versiyonda ise aynı ödeme-patlaması + rollback gerçek kredi kartı limiti aşılarak tetikleniyor (davranış aynı, tetikleme farklı). Otomatik test komutu (mvn test -DforkCount=0 "-Dtest=OrderServiceRollbackTest,MultiItemOrderTest") zaten var, o kalsın.
+
+Mantıklı — ikinci testin (ödeme kaynaklı rollback) de canlı karşılığı olsun. Önce o bölümün güncel halini görüp etiketleyerek düzenleyeyim:
+
+Read
+README.md
+İkinci bloğu ekleyip iki örneği de etiketliyorum (hangi test → hangi tetikleyici), dürüst notuyla:
+
+Edited
+README.md
++20
+-3
+Eklendi. Artık o bölümde iki PowerShell örneği var, ikisi de etiketli:
+
+Stok kaynaklı rollback (409) → MultiItemOrderTest — Mouse×5 + Pen×100, sonra Mouse stoğu hâlâ 200.
+Ödeme kaynaklı rollback (422) → OrderServiceRollbackTest — Laptop(id=1)×7 = 10.499,93 > 10.000 CC limiti, sonra Laptop stoğu hâlâ 25.
+Altına dürüst notu da koydum: OrderServiceRollbackTest testin içinde ödemeyi @MockBean ile patlatıyor; manuel 2. örnek aynı ödeme-patlaması + rollback'i gerçek CC limiti aşılarak tetikliyor — davranış aynı (422 + stok geri sarılır), tetikleme farklı. Otomatik test komutu olduğu gibi duruyor.
+
+Her iki örnek bağımsız (biri id=2/8'e, diğeri id=1'e dokunuyor) ve 2. örnek zaten 422 ile başarısız olduğu için id=1 stoğunu değiştirmiyor — yani sıralarından bağımsız çalışırlar. Markdown değişikliği olduğu için test/derleme etkilenmedi; proje teslim durumunu koruyor.
